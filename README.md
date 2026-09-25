@@ -95,16 +95,20 @@ This writes:
 
 - `data-processed/elo_tournaments_proposed.csv` — tournaments currently proposed for inclusion;
 - `data-processed/elo_tournament_selection_audit.csv` — every classified VIS tournament with include/exclude/review status and reason;
-- `data-processed/elo_tournaments_needing_review.csv` — unresolved classifications that should be reviewed before a production Elo profile is frozen;
+- `data-processed/elo_tournaments_needing_review.csv` — unresolved or ambiguous selections that should be reviewed before a production Elo profile is frozen;
+- `data-processed/elo_continental_tournament_audit.csv` — all senior continental candidates with organizer code and selection decision;
 - `data-processed/elo_tournament_selection_summary.csv` — counts by selection status and event class.
 
 Unresolved legacy tournaments are deliberately surfaced as `review`; they are not silently treated as Elo exclusions.
 
-`config/elo.yml` controls which matches feed Elo. The initial profile is deliberately broad across senior international FIVB tour products so that historical coverage can be audited before narrower research-specific profiles are frozen.
+`config/elo.yml` controls which matches feed Elo. The current profile begins on 2008-01-01 because earlier VIS match coverage is not considered reliable enough for Elo construction. The raw VIS archive remains broader.
+
+The profile includes the selected senior FIVB / World Tour / Beach Pro Tour classes plus senior continental events from AVC, NORCECA, CSV, and CEV. CAVB events are explicitly excluded from this Elo profile. Youth continental classes and zonal tours remain excluded.
 
 Selection supports:
 
-- included event classes;
+- included FIVB event classes;
+- selected senior continental event classes and confederation organizer codes;
 - manually included tournament IDs;
 - manually excluded tournament IDs;
 - manually included match IDs;
@@ -180,6 +184,7 @@ data-processed/beach_tournaments_classified.parquet
 data-processed/elo_tournaments_proposed.csv
 data-processed/elo_tournament_selection_audit.csv
 data-processed/elo_tournaments_needing_review.csv
+data-processed/elo_continental_tournament_audit.csv
 data-processed/beach_matches.parquet
 data-processed/elo_matches.parquet
 data-processed/athlete_elo_history.parquet
