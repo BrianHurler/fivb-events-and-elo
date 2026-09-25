@@ -438,6 +438,10 @@ calculate_athlete_elo <- function(matches, initial_rating = 1500,
 
     purrr::walk2(ids, post, set_rating)
 
+    if (i %% 5000L == 0L || i == nrow(matches)) {
+      message("Calculated Elo for ", i, " / ", nrow(matches), " matches.")
+    }
+
     team_a_fed <- if ("team_a_federation_code" %in% names(row)) {
       as.character(row$team_a_federation_code[[1]])
     } else NA_character_
