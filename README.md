@@ -36,6 +36,7 @@ The raw VIS layer is intentionally broader than any one downstream research proj
 │   ├── 00-setup.R
 │   ├── 01-pull-events.R
 │   ├── 02-classify-tournaments.R
+│   ├── 02b-build-elo-tournament-universe.R
 │   ├── 03-pull-matches.R
 │   ├── 04-build-elo-input.R
 │   ├── 05-calculate-elo.R
@@ -58,7 +59,7 @@ Stage 01 requests both:
 - `GetEventList` — the general VIS event container history;
 - `GetBeachTournamentList` — the beach-tournament history used as the canonical competition table.
 
-Stage 03 requests `GetBeachMatchList` separately for each beach tournament using its VIS `No` identifier.
+Stage 02b materializes the proposed tournament universe for Elo review before any match-level Elo selection. Stage 03 requests `GetBeachMatchList` separately for each beach tournament using its VIS `No` identifier.
 
 ## Tournament classification
 
@@ -83,6 +84,21 @@ The raw VIS type remains available even when a practical class is added.
 Manual historical corrections belong in `config/tournament-overrides.csv`. An override is keyed by the stable VIS tournament number, replaces only the practical `event_class`, records a note, and is surfaced as `classification_source = "manual_override"`. This keeps one auditable home for the classification decisions that were previously repeated across projects.
 
 ## Elo selection
+
+Before pulling or calculating Elo, run:
+
+```r
+source("scripts/02b-build-elo-tournament-universe.R")
+```
+
+This writes:
+
+- `data-processed/elo_tournaments_proposed.csv` — tournaments currently proposed for inclusion;
+- `data-processed/elo_tournament_selection_audit.csv` — every classified VIS tournament with include/exclude/review status and reason;
+- `data-processed/elo_tournaments_needing_review.csv` — unresolved classifications that should be reviewed before a production Elo profile is frozen;
+- `data-processed/elo_tournament_selection_summary.csv` — counts by selection status and event class.
+
+Unresolved legacy tournaments are deliberately surfaced as `review`; they are not silently treated as Elo exclusions.
 
 `config/elo.yml` controls which matches feed Elo. The initial profile is deliberately broad across senior international FIVB tour products so that historical coverage can be audited before narrower research-specific profiles are frozen.
 
@@ -161,6 +177,9 @@ After a complete run:
 data-processed/vis_events.parquet
 data-processed/beach_tournaments.parquet
 data-processed/beach_tournaments_classified.parquet
+data-processed/elo_tournaments_proposed.csv
+data-processed/elo_tournament_selection_audit.csv
+data-processed/elo_tournaments_needing_review.csv
 data-processed/beach_matches.parquet
 data-processed/elo_matches.parquet
 data-processed/athlete_elo_history.parquet
