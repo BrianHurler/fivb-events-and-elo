@@ -35,6 +35,8 @@ build_elo_tournament_audit <- function(tournaments, config) {
       classification_source = NA_character_,
       classification_notes = NA_character_,
       country_code = NA_character_,
+      organizer_type = NA_character_,
+      organizer_code = NA_character_,
       start_date_qualification = NA_character_,
       end_date_qualification = NA_character_,
       start_date_main_draw = NA_character_,
@@ -42,10 +44,24 @@ build_elo_tournament_audit <- function(tournaments, config) {
     )
   )
 
-  include_classes <- as.character(unlist(config$selection$include_event_classes))
-  include_nos <- as.integer(unlist(config$selection$include_tournament_nos))
-  exclude_nos <- as.integer(unlist(config$selection$exclude_tournament_nos))
-  allowed_genders <- as.character(unlist(config$selection$genders))
+  config_chr <- function(x) {
+    if (is.null(x) || length(x) == 0L) return(character())
+    as.character(unlist(x))
+  }
+
+  include_classes <- config_chr(config$selection$include_event_classes)
+  continental_classes <- config_chr(
+    config$selection$include_continental_event_classes
+  )
+  continental_organizers <- toupper(config_chr(
+    config$selection$include_continental_organizer_codes
+  ))
+  continental_excluded_organizers <- toupper(config_chr(
+    config$selection$exclude_continental_organizer_codes
+  ))
+  include_nos <- as.integer(config_chr(config$selection$include_tournament_nos))
+  exclude_nos <- as.integer(config_chr(config$selection$exclude_tournament_nos))
+  allowed_genders <- config_chr(config$selection$genders)
 
   start_limit <- as_date_or_null(config$selection$start_date)
   end_limit <- as_date_or_null(config$selection$end_date)
@@ -66,13 +82,25 @@ build_elo_tournament_audit <- function(tournaments, config) {
         as.Date(end_date_qualification)
       ),
       event_year = suppressWarnings(as.integer(format(start_date, "%Y"))),
+      organizer_code_normalized = toupper(trimws(as.character(organizer_code))),
       gender_allowed = gender %in% allowed_genders,
       class_selected = !is.na(event_class) & event_class %in% include_classes,
+      continental_candidate =
+        !is.na(event_class) & event_class %in% continental_classes,
+      continental_selected =
+        continental_candidate &
+        organizer_code_normalized %in% continental_organizers,
+      continental_explicit_exclude =
+        continental_candidate &
+        organizer_code_normalized %in% continental_excluded_organizers,
+      continental_unknown_organizer =
+        continental_candidate &
+        !continental_selected &
+        !continental_explicit_exclude,
       manual_include = tournament_no %in% include_nos,
       manual_exclude = tournament_no %in% exclude_nos,
       unresolved_classification =
         is.na(event_class) |
-        event_class == "Other" |
         classification_source == "unclassified",
       within_start_date = if (is.null(start_limit)) {
         TRUE
@@ -91,6 +119,9 @@ build_elo_tournament_audit <- function(tournaments, config) {
         !within_date_window ~ "exclude",
         manual_include ~ "include",
         class_selected ~ "include",
+        continental_selected ~ "include",
+        continental_explicit_exclude ~ "exclude",
+        continental_unknown_organizer ~ "review",
         unresolved_classification ~ "review",
         TRUE ~ "exclude"
       ),
@@ -99,9 +130,26 @@ build_elo_tournament_audit <- function(tournaments, config) {
         !gender_allowed ~ "gender not selected by Elo profile",
         !within_date_window ~ "outside Elo profile date window",
         manual_include ~ "manual tournament inclusion",
-        class_selected ~ paste0("selected event class: ", event_class),
+        class_selected ~ paste0("selected FIVB event class: ", event_class),
+        continental_selected ~ paste0(
+          "selected continental event: ",
+          event_class,
+          " / ",
+          organizer_code_normalized
+        ),
+        continental_explicit_exclude ~ paste0(
+          "continental organizer explicitly excluded: ",
+          organizer_code_normalized
+        ),
+        continental_unknown_organizer ~ paste0(
+          "continental event with unrecognized organizer: ",
+          dplyr::coalesce(organizer_code_normalized, "NA")
+        ),
         unresolved_classification ~ "unresolved tournament classification",
-        TRUE ~ paste0("event class not selected: ", dplyr::coalesce(event_class, "NA"))
+        TRUE ~ paste0(
+          "event class not selected: ",
+          dplyr::coalesce(event_class, "NA")
+        )
       ),
       elo_profile = config$profile_name
     ) |>
@@ -116,6 +164,9 @@ build_elo_tournament_audit <- function(tournaments, config) {
       season,
       gender,
       event_class,
+      organizer_type,
+      organizer_code,
+      organizer_code_normalized,
       vis_type_raw,
       vis_type_name,
       classification_source,
@@ -175,19 +226,17 @@ prepare_elo_matches <- function(matches, tournaments, config) {
     )
   )
 
-  tournament_context <- tournaments |>
+  tournament_audit <- build_elo_tournament_audit(tournaments, config)
+
+  tournament_context <- tournament_audit |>
     dplyr::transmute(
-      no_tournament = no,
+      no_tournament = tournament_no,
       gender = as.character(gender),
       event_class = as.character(event_class),
-      tournament_name_classified = dplyr::coalesce(
-        as.character(title),
-        as.character(name)
-      ),
-      tournament_start = dplyr::coalesce(
-        as.Date(start_date_qualification),
-        as.Date(start_date_main_draw)
-      )
+      tournament_name_classified = tournament_name,
+      tournament_start = start_date,
+      elo_tournament_status = elo_selection_status,
+      elo_tournament_reason = elo_selection_reason
     )
 
   out <- matches |>
@@ -221,24 +270,15 @@ prepare_elo_matches <- function(matches, tournaments, config) {
       gender %in% unlist(config$selection$genders)
     )
 
-  include_classes <- unlist(config$selection$include_event_classes)
-  include_nos <- as.integer(unlist(config$selection$include_tournament_nos))
-  exclude_nos <- as.integer(unlist(config$selection$exclude_tournament_nos))
   include_match_nos <- as.integer(unlist(config$selection$include_match_nos))
   exclude_match_nos <- as.integer(unlist(config$selection$exclude_match_nos))
+  exclude_nos <- as.integer(unlist(config$selection$exclude_tournament_nos))
 
-  has_explicit_selection <- length(include_classes) > 0L ||
-    length(include_nos) > 0L ||
-    length(include_match_nos) > 0L
-
-  if (has_explicit_selection) {
-    out <- out |>
-      dplyr::filter(
-        event_class %in% include_classes |
-          no_tournament %in% include_nos |
-          no %in% include_match_nos
-      )
-  }
+  out <- out |>
+    dplyr::filter(
+      elo_tournament_status == "include" |
+        no %in% include_match_nos
+    )
 
   if (length(exclude_nos) > 0L) {
     out <- out |>
