@@ -894,6 +894,28 @@ readr::write_csv(
 message("\nWhy legacy 2008+ matches are excluded from the new Elo universe:")
 print(legacy_exclusion_summary, n = Inf)
 
+olympic_qualification_exclusions <- legacy_only_raw |>
+  dplyr::filter(event_class == "Olympic Qualification") |>
+  dplyr::mutate(year = as.integer(format(match_date, "%Y"))) |>
+  dplyr::count(
+    gender,
+    year,
+    no_tournament,
+    tournament_name_current,
+    sort = TRUE,
+    name = "matches"
+  )
+
+readr::write_csv(
+  olympic_qualification_exclusions,
+  "data-processed/legacy_olympic_qualification_exclusions.csv"
+)
+
+if (nrow(olympic_qualification_exclusions) > 0L) {
+  message("\nLegacy Olympic Qualification matches excluded by current profile:")
+  print(olympic_qualification_exclusions, n = Inf, width = Inf)
+}
+
 message("\nLargest legacy 2008+ raw-archive gaps:")
 print(
   legacy_missing_raw_summary |>
@@ -923,6 +945,18 @@ legacy_formula_base <- legacy |>
     legacy_match_id = as.character(match_id),
     athlete_id = as.character(athlete),
     partner_id = as.character(partner),
+    match_date = as.Date(date),
+    gender = as.character(gender),
+    tournament = if ("tourn" %in% names(legacy)) {
+      as.character(tourn)
+    } else {
+      NA_character_
+    },
+    tournament_category = if ("tourn_cat" %in% names(legacy)) {
+      as.character(tourn_cat)
+    } else {
+      NA_character_
+    },
     actual_score = suppressWarnings(as.numeric(result)),
     elo_before = as.numeric(athlete_elo_before),
     elo_after = as.numeric(athlete_elo_after),
@@ -954,6 +988,10 @@ legacy_formula_check <- legacy_formula_base |>
     legacy_match_id,
     athlete_id,
     partner_id,
+    match_date,
+    gender,
+    tournament,
+    tournament_category,
     actual_score,
     elo_before,
     elo_after,
@@ -986,9 +1024,38 @@ readr::write_csv(
   "data-processed/legacy_elo_formula_parity.csv"
 )
 
+legacy_formula_outliers <- legacy_formula_check |>
+  dplyr::filter(abs_formula_error > 1e-6) |>
+  dplyr::arrange(dplyr::desc(abs_formula_error))
+
+readr::write_csv(
+  legacy_formula_outliers,
+  "data-processed/legacy_elo_formula_outliers.csv"
+)
+
+legacy_formula_outlier_summary <- legacy_formula_outliers |>
+  dplyr::mutate(
+    year = as.integer(format(match_date, "%Y"))
+  ) |>
+  dplyr::count(
+    gender,
+    year,
+    tournament_category,
+    tournament,
+    sort = TRUE,
+    name = "athlete_match_rows"
+  )
+
+readr::write_csv(
+  legacy_formula_outlier_summary,
+  "data-processed/legacy_elo_formula_outlier_summary.csv"
+)
+
 legacy_formula_summary <- tibble::tibble(
   metric = c(
     "eligible_athlete_match_rows",
+    "formula_outlier_rows_gt_1e_6",
+    "formula_outlier_matches_gt_1e_6",
     "mean_abs_formula_error",
     "median_abs_formula_error",
     "max_abs_formula_error",
@@ -998,6 +1065,8 @@ legacy_formula_summary <- tibble::tibble(
   ),
   value = c(
     nrow(legacy_formula_check),
+    nrow(legacy_formula_outliers),
+    dplyr::n_distinct(legacy_formula_outliers$legacy_match_id),
     mean(legacy_formula_check$abs_formula_error, na.rm = TRUE),
     stats::median(
       legacy_formula_check$abs_formula_error,
@@ -1017,6 +1086,30 @@ readr::write_csv(
 
 message("\nLegacy K=30 Elo formula parity:")
 print(legacy_formula_summary, n = Inf)
+
+message("\nLargest legacy formula-parity outliers:")
+print(
+  legacy_formula_outliers |>
+    dplyr::select(
+      legacy_match_id,
+      match_date,
+      gender,
+      tournament_category,
+      tournament,
+      athlete_id,
+      actual_score,
+      elo_before,
+      opponent_team_mean_elo,
+      k_factor,
+      elo_after,
+      reconstructed_after,
+      formula_error,
+      abs_formula_error
+    ) |>
+    dplyr::slice_head(n = 25L),
+  n = 25,
+  width = Inf
+)
 
 if ("tourn_cat" %in% names(legacy)) {
   message("\nLegacy tournament categories:")
