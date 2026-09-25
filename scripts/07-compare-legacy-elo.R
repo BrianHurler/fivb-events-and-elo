@@ -5,6 +5,25 @@ assert_project_root()
 check_packages()
 source_project_functions()
 
+# Select the intended named profile before loading the cloudyr AWS packages.
+aws_profile <- Sys.getenv("AWS_PROFILE", unset = "brian-hurler")
+aws_region <- Sys.getenv("AWS_DEFAULT_REGION", unset = "us-west-1")
+
+if (aws_profile == "") aws_profile <- "brian-hurler"
+if (aws_region == "") aws_region <- "us-west-1"
+
+Sys.setenv(
+  AWS_PROFILE = aws_profile,
+  AWS_DEFAULT_REGION = aws_region
+)
+
+if (!requireNamespace("aws.signature", quietly = TRUE)) {
+  stop(
+    "Stage 07 requires the optional package 'aws.signature'.",
+    call. = FALSE
+  )
+}
+
 if (!requireNamespace("aws.s3", quietly = TRUE)) {
   stop(
     "Stage 07 requires the optional package 'aws.s3'. Install it with install.packages('aws.s3').",
@@ -12,12 +31,28 @@ if (!requireNamespace("aws.s3", quietly = TRUE)) {
   )
 }
 
-if (Sys.getenv("AWS_PROFILE") == "") {
-  Sys.setenv(AWS_PROFILE = "brian-hurler")
+# aws.signature may resolve credentials during package load. Explicitly re-read
+# the requested named profile so an already-loaded default credential cannot
+# silently win.
+credential_result <- try(
+  aws.signature::use_credentials(profile = aws_profile),
+  silent = TRUE
+)
+
+if (inherits(credential_result, "try-error")) {
+  stop(
+    "Could not load AWS credentials for profile '",
+    aws_profile,
+    "': ",
+    as.character(credential_result),
+    call. = FALSE
+  )
 }
-if (Sys.getenv("AWS_DEFAULT_REGION") == "") {
-  Sys.setenv(AWS_DEFAULT_REGION = "us-west-1")
-}
+
+message(
+  "Using AWS profile '", aws_profile,
+  "' in region '", aws_region, "'."
+)
 
 legacy_bucket <- "usavbeach"
 legacy_key <- "elo/long_matches_k_factor_30.rda"
