@@ -26,13 +26,115 @@ legacy_cache <- "data-raw/long_matches_k_factor_30.rda"
 dir.create("data-raw", recursive = TRUE, showWarnings = FALSE)
 dir.create("data-processed", recursive = TRUE, showWarnings = FALSE)
 
+extract_xml_error <- function(x) {
+  txt <- tryCatch(
+    {
+      if (is.raw(x)) {
+        rawToChar(x)
+      } else if (is.character(x)) {
+        paste(x, collapse = "")
+      } else {
+        return(NULL)
+      }
+    },
+    error = function(e) NULL
+  )
+
+  if (is.null(txt) || !grepl("^\\s*<", txt)) return(NULL)
+
+  doc <- tryCatch(xml2::read_xml(txt), error = function(e) NULL)
+  if (is.null(doc)) return(list(code = "XMLResponse", message = txt))
+
+  node_text <- function(xpath) {
+    node <- xml2::xml_find_first(doc, xpath)
+    if (inherits(node, "xml_missing")) return(NA_character_)
+    xml2::xml_text(node)
+  }
+
+  list(
+    code = node_text(".//*[local-name()='Code']"),
+    message = node_text(".//*[local-name()='Message']"),
+    request_id = node_text(".//*[local-name()='RequestId']")
+  )
+}
+
+cached_xml_error <- function(path) {
+  if (!file.exists(path) || file.info(path)$size == 0) return(NULL)
+
+  n <- min(as.integer(file.info(path)$size), 8192L)
+  con <- file(path, open = "rb")
+  on.exit(close(con), add = TRUE)
+  bytes <- readBin(con, what = "raw", n = n)
+
+  extract_xml_error(bytes)
+}
+
+cache_error <- cached_xml_error(legacy_cache)
+if (!is.null(cache_error)) {
+  message(
+    "Discarding invalid cached S3 response (",
+    dplyr::coalesce(cache_error$code, "XML"),
+    "): ",
+    dplyr::coalesce(cache_error$message, "unknown S3 error")
+  )
+  unlink(legacy_cache)
+}
+
 if (!file.exists(legacy_cache) || force_refresh()) {
   message("Downloading legacy Elo artifact from S3...")
+
   raw_object <- aws.s3::get_object(
     object = legacy_key,
     bucket = legacy_bucket
   )
-  writeBin(raw_object, legacy_cache)
+
+  s3_error <- extract_xml_error(raw_object)
+  if (!is.null(s3_error)) {
+    stop(
+      "S3 returned XML instead of the legacy RDA. Code: ",
+      dplyr::coalesce(s3_error$code, "unknown"),
+      "; message: ",
+      dplyr::coalesce(s3_error$message, "unknown"),
+      if (!is.na(s3_error$request_id)) {
+        paste0("; request_id: ", s3_error$request_id)
+      } else {
+        ""
+      },
+      call. = FALSE
+    )
+  }
+
+  if (!is.raw(raw_object)) {
+    stop(
+      "Unexpected S3 response type: ",
+      paste(class(raw_object), collapse = "/"),
+      ". Expected raw RDA bytes.",
+      call. = FALSE
+    )
+  }
+
+  temp_cache <- paste0(legacy_cache, ".download")
+  writeBin(raw_object, temp_cache)
+
+  validation_env <- new.env(parent = emptyenv())
+  validation <- try(
+    load(temp_cache, envir = validation_env),
+    silent = TRUE
+  )
+
+  if (inherits(validation, "try-error")) {
+    unlink(temp_cache)
+    stop(
+      "Downloaded S3 object is not a valid RDA: ",
+      as.character(validation),
+      call. = FALSE
+    )
+  }
+
+  if (!file.rename(temp_cache, legacy_cache)) {
+    unlink(temp_cache)
+    stop("Could not move validated legacy RDA into cache.", call. = FALSE)
+  }
 } else {
   message("Using cached legacy Elo artifact: ", legacy_cache)
 }
