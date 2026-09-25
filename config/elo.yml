@@ -68,7 +68,8 @@ selection:
     - 6271
     - 7003
     - 7496
-  exclude_tournament_nos: []
+  exclude_tournament_nos:
+    - 505
 
   # VIS BeachMatch No values. Explicit match includes join the selected universe;
   # explicit match excludes are applied last.
