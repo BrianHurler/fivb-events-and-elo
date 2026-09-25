@@ -44,22 +44,39 @@ matches_audit <- matches |>
     suffix = c("", "_classified")
   )
 
+selected_matches <- matches_audit |>
+  dplyr::filter(
+    elo_selection_status == "include",
+    local_date >= as.Date(config$selection$start_date)
+  )
+
+plausible_dates <- matches_audit$local_date[
+  !is.na(matches_audit$local_date) &
+    matches_audit$local_date >= as.Date("1980-01-01")
+]
+
 overview <- tibble::tibble(
   metric = c(
     "unique_matches",
-    "first_match_date",
+    "first_raw_match_date",
+    "first_plausible_match_date",
     "last_match_date",
     "matches_before_2008",
     "matches_2008_onward",
     "matches_in_selected_elo_tournaments",
     "matches_in_review_tournaments",
-    "missing_player_ids",
-    "missing_team_ids",
-    "non_decisive_match_points"
+    "missing_player_ids_all",
+    "missing_team_ids_all",
+    "non_decisive_match_points_all",
+    "selected_missing_player_ids",
+    "selected_missing_team_ids",
+    "selected_non_decisive_match_points",
+    "selected_valid_decisive_with_ids"
   ),
   value = c(
     as.character(dplyr::n_distinct(matches_audit$no)),
     as.character(min(matches_audit$local_date, na.rm = TRUE)),
+    as.character(min(plausible_dates, na.rm = TRUE)),
     as.character(max(matches_audit$local_date, na.rm = TRUE)),
     as.character(sum(matches_audit$local_date < as.Date("2008-01-01"), na.rm = TRUE)),
     as.character(sum(matches_audit$local_date >= as.Date("2008-01-01"), na.rm = TRUE)),
@@ -67,7 +84,16 @@ overview <- tibble::tibble(
     as.character(sum(matches_audit$elo_selection_status == "review", na.rm = TRUE)),
     as.character(sum(matches_audit$missing_player_id, na.rm = TRUE)),
     as.character(sum(matches_audit$missing_team_id, na.rm = TRUE)),
-    as.character(sum(!matches_audit$decisive_match_points, na.rm = TRUE))
+    as.character(sum(!matches_audit$decisive_match_points, na.rm = TRUE)),
+    as.character(sum(selected_matches$missing_player_id, na.rm = TRUE)),
+    as.character(sum(selected_matches$missing_team_id, na.rm = TRUE)),
+    as.character(sum(!selected_matches$decisive_match_points, na.rm = TRUE)),
+    as.character(sum(
+      !selected_matches$missing_player_id &
+      !selected_matches$missing_team_id &
+      selected_matches$decisive_match_points,
+      na.rm = TRUE
+    ))
   )
 )
 
@@ -104,6 +130,59 @@ readr::write_csv(
 readr::write_csv(
   by_elo_class,
   "data-processed/match_archive_selected_by_class.csv",
+  na = ""
+)
+
+bad_dates <- matches_audit |>
+  dplyr::filter(
+    !is.na(local_date),
+    local_date < as.Date("1980-01-01")
+  ) |>
+  dplyr::arrange(local_date, no)
+
+selected_anomalies <- selected_matches |>
+  dplyr::filter(
+    missing_player_id |
+    missing_team_id |
+    !decisive_match_points
+  ) |>
+  dplyr::arrange(local_date, no)
+
+review_matches <- matches_audit |>
+  dplyr::filter(elo_selection_status == "review") |>
+  dplyr::arrange(local_date, no)
+
+selected_result_types <- selected_matches |>
+  dplyr::mutate(
+    result_type = dplyr::coalesce(as.character(result_type), "NA"),
+    status = dplyr::coalesce(as.character(status), "NA")
+  ) |>
+  dplyr::count(
+    result_type,
+    status,
+    decisive_match_points,
+    missing_player_id,
+    sort = TRUE
+  )
+
+readr::write_csv(
+  bad_dates,
+  "data-processed/match_archive_bad_dates.csv",
+  na = ""
+)
+readr::write_csv(
+  selected_anomalies,
+  "data-processed/elo_selected_match_anomalies.csv",
+  na = ""
+)
+readr::write_csv(
+  review_matches,
+  "data-processed/matches_in_review_tournaments.csv",
+  na = ""
+)
+readr::write_csv(
+  selected_result_types,
+  "data-processed/elo_selected_result_types.csv",
   na = ""
 )
 
