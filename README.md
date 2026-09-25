@@ -121,6 +121,7 @@ Selection supports:
 - men/women;
 - optional start/end dates;
 - qualification inclusion;
+- allowed VIS match result types;
 - Elo K-factor and starting rating.
 
 Explicit includes are additive to the class-based universe; explicit excludes are applied last. A downstream project should consume a named/frozen selection rather than edit historical data.
@@ -141,6 +142,8 @@ where:
 - opponent strength is the equal-weight mean of the two opponent athletes;
 - each athlete is updated individually;
 - all four pre-match ratings are read before any of the four updates are applied.
+
+Only VIS `ResultType = 0` (normal completion) is eligible to move Elo in the current profile. Injury, forfeit, out, and disqualification results remain preserved in the raw match archive but are excluded from rating updates.
 
 The output is one row per athlete per match, with athlete, partner, opponents, event context, pre-match Elo, expected win probability, Elo change, and post-match Elo.
 
