@@ -96,6 +96,10 @@ These overrides include several events whose VIS organizer metadata are blank or
 
 Tournament No 505 (`Congress 2010`) is excluded after review because it is not a beach-volleyball competition despite appearing in the VIS tournament archive.
 
+### 2026-09-25 — Elo matches require four distinct player IDs
+
+VIS records with missing/non-positive player IDs or duplicate player IDs within the same match are excluded from Elo construction. The calculator retains a hard stop as a final guardrail if any malformed match bypasses preprocessing.
+
 ### 2026-09-25 — Only normal completed matches move Elo
 
 The current Elo profile includes only VIS beach match `ResultType = 0` (Normal).
