@@ -15,7 +15,11 @@ history <- read_parquet("data-processed/athlete_elo_history.parquet")
 current <- read_parquet("data-processed/athlete_elo_current.parquet")
 
 first_rows <- history |>
-  dplyr::arrange(date, local_time, match_no) |>
+  dplyr::arrange(
+    date,
+    dplyr::coalesce(as.character(local_time), "00:00:00"),
+    match_no
+  ) |>
   dplyr::group_by(athlete_id) |>
   dplyr::slice_head(n = 1L) |>
   dplyr::ungroup()
