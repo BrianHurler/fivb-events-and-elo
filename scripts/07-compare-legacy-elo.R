@@ -411,6 +411,11 @@ raw_tournament_gender <- classified_tournaments |>
   ) |>
   dplyr::distinct(no_tournament, .keep_all = TRUE)
 
+message("Building cross-source four-athlete match fingerprints...")
+
+# The raw archive is much larger than the legacy/new Elo histories. Build its
+# four-player fingerprint with a vectorized four-value sorting network rather
+# than rowwise() so this QA stage stays fast.
 raw_match_rosters <- raw_matches |>
   dplyr::left_join(raw_tournament_gender, by = "no_tournament") |>
   dplyr::filter(!is.na(local_date), as.Date(local_date) <= as_of_date) |>
@@ -418,23 +423,42 @@ raw_match_rosters <- raw_matches |>
     raw_match_no = as.character(no),
     match_date = as.Date(local_date),
     gender,
-    no_player_a1 = as.character(no_player_a1),
-    no_player_a2 = as.character(no_player_a2),
-    no_player_b1 = as.character(no_player_b1),
-    no_player_b2 = as.character(no_player_b2)
+    a = suppressWarnings(as.numeric(no_player_a1)),
+    b = suppressWarnings(as.numeric(no_player_a2)),
+    c = suppressWarnings(as.numeric(no_player_b1)),
+    d = suppressWarnings(as.numeric(no_player_b2))
   ) |>
-  dplyr::rowwise() |>
+  dplyr::filter(
+    !is.na(gender),
+    !is.na(a), !is.na(b), !is.na(c), !is.na(d),
+    a > 0, b > 0, c > 0, d > 0
+  ) |>
   dplyr::mutate(
-    athlete_count = dplyr::n_distinct(
-      c(no_player_a1, no_player_a2, no_player_b1, no_player_b2),
-      na.rm = TRUE
+    p1 = pmin(a, b),
+    p2 = pmax(a, b),
+    p3 = pmin(c, d),
+    p4 = pmax(c, d),
+    s1 = pmin(p1, p3),
+    hi13 = pmax(p1, p3),
+    lo24 = pmin(p2, p4),
+    s4 = pmax(p2, p4),
+    s2 = pmin(hi13, lo24),
+    s3 = pmax(hi13, lo24),
+    athlete_count = dplyr::if_else(
+      s1 < s2 & s2 < s3 & s3 < s4,
+      4L,
+      3L
     ),
-    roster_key = make_roster_key(
-      c(no_player_a1, no_player_a2, no_player_b1, no_player_b2)
+    roster_key = paste(
+      format(s1, scientific = FALSE, trim = TRUE),
+      format(s2, scientific = FALSE, trim = TRUE),
+      format(s3, scientific = FALSE, trim = TRUE),
+      format(s4, scientific = FALSE, trim = TRUE),
+      sep = "|"
     ),
     fingerprint = paste(match_date, gender, roster_key, sep = "||")
   ) |>
-  dplyr::ungroup() |>
+  dplyr::filter(athlete_count == 4L) |>
   dplyr::select(
     raw_match_no, match_date, gender, athlete_count,
     roster_key, fingerprint
