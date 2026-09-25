@@ -359,6 +359,22 @@ classified_tournaments <- read_parquet(
   "data-processed/beach_tournaments_classified.parquet"
 )
 
+# VIS omits optional attributes when they are not populated. Mirror the main
+# Elo preparation stage so this QA script is robust to those schema variants.
+raw_matches <- add_missing_columns(
+  raw_matches,
+  list(
+    deleted_dt = NA_character_,
+    result_type = NA_integer_,
+    round_name = NA_character_,
+    round_code = NA_character_,
+    match_points_a = NA_real_,
+    match_points_b = NA_real_,
+    no_team_a = NA_real_,
+    no_team_b = NA_real_
+  )
+)
+
 make_roster_key <- function(ids) {
   ids <- sort(unique(as.character(ids[!is.na(ids) & ids != ""])))
   paste(ids, collapse = "|")
