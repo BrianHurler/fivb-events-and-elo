@@ -43,6 +43,7 @@ The raw VIS layer is intentionally broader than any one downstream research proj
 │   ├── 05-calculate-elo.R
 │   ├── 05b-enrich-elo-players.R
 │   ├── 06-validate-outputs.R
+│   ├── 07-compare-legacy-elo.R
 │   └── run-all.R
 ├── data-raw/                 # ignored
 └── data-processed/           # ignored
@@ -238,3 +239,19 @@ A future integration should therefore pass stable artifacts such as classified t
 - beach participation/activity flags.
 
 `scripts/05b-enrich-elo-players.R` joins those fields onto the existing Elo history/current artifacts without recalculating Elo. It also writes `player_key_coverage.csv` so missing-name coverage is explicit.
+
+
+## Legacy Elo comparison
+
+`scripts/07-compare-legacy-elo.R` is an optional QA stage and is intentionally not part of `run-all.R` because it requires authenticated S3 access and the optional `aws.s3` package.
+
+It downloads or reuses the legacy production artifact at `s3://usavbeach/elo/long_matches_k_factor_30.rda` and compares it with the rebuilt canonical history. Outputs include:
+
+- legacy object schema;
+- overall coverage;
+- athlete-match row coverage by year and gender;
+- current Elo overlap for athletes active in both systems;
+- rating deltas, career-match-count deltas, and last-match-date deltas;
+- summary correlation and absolute differences by gender.
+
+The legacy dashboard documents a narrower Challenge-or-higher competition universe than the new broad profile, so rating differences should first be separated into competition-universe effects versus Elo-calculation differences.
