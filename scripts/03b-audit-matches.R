@@ -30,6 +30,15 @@ matches_audit <- matches |>
       is.na(no_player_a2) | no_player_a2 <= 0 |
       is.na(no_player_b1) | no_player_b1 <= 0 |
       is.na(no_player_b2) | no_player_b2 <= 0,
+    duplicate_player_id = dplyr::coalesce(
+      no_player_a1 == no_player_a2 |
+      no_player_a1 == no_player_b1 |
+      no_player_a1 == no_player_b2 |
+      no_player_a2 == no_player_b1 |
+      no_player_a2 == no_player_b2 |
+      no_player_b1 == no_player_b2,
+      FALSE
+    ),
     missing_team_id =
       is.na(no_team_a) | no_team_a <= 0 |
       is.na(no_team_b) | no_team_b <= 0,
@@ -70,8 +79,9 @@ overview <- tibble::tibble(
     "non_decisive_match_points_all",
     "selected_missing_player_ids",
     "selected_missing_team_ids",
+    "selected_duplicate_player_ids",
     "selected_non_decisive_match_points",
-    "selected_valid_decisive_with_ids"
+    "selected_valid_decisive_unique_ids"
   ),
   value = c(
     as.character(dplyr::n_distinct(matches_audit$no)),
@@ -87,9 +97,11 @@ overview <- tibble::tibble(
     as.character(sum(!matches_audit$decisive_match_points, na.rm = TRUE)),
     as.character(sum(selected_matches$missing_player_id, na.rm = TRUE)),
     as.character(sum(selected_matches$missing_team_id, na.rm = TRUE)),
+    as.character(sum(selected_matches$duplicate_player_id, na.rm = TRUE)),
     as.character(sum(!selected_matches$decisive_match_points, na.rm = TRUE)),
     as.character(sum(
       !selected_matches$missing_player_id &
+      !selected_matches$duplicate_player_id &
       !selected_matches$missing_team_id &
       selected_matches$decisive_match_points,
       na.rm = TRUE
@@ -143,6 +155,7 @@ bad_dates <- matches_audit |>
 selected_anomalies <- selected_matches |>
   dplyr::filter(
     missing_player_id |
+    duplicate_player_id |
     missing_team_id |
     !decisive_match_points
   ) |>
@@ -170,6 +183,7 @@ selected_result_types <- selected_matches |>
 selected_valid_result_types <- selected_matches |>
   dplyr::filter(
     !missing_player_id,
+    !duplicate_player_id,
     !missing_team_id,
     decisive_match_points
   ) |>
