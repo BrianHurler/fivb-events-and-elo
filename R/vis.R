@@ -131,3 +131,67 @@ vis_get_beach_matches <- function(no_tournament, api_url = VIS_API_URL) {
     api_url = api_url
   )
 }
+
+
+vis_get_beach_players <- function(api_url = VIS_API_URL) {
+  fields <- c(
+    "No",
+    "FederationCode",
+    "FirstName",
+    "LastName",
+    "Gender",
+    "Nationality",
+    "TeamName",
+    "PopularName",
+    "PlaysBeach",
+    "ActiveBeach"
+  )
+
+  players <- vis_request_list(
+    type = "GetPlayerList",
+    fields = fields,
+    filter_xml = '<Filter PlaysBeach="1"/>',
+    node_name = "Player",
+    api_url = api_url
+  )
+
+  players |>
+    dplyr::mutate(
+      athlete_id = as.character(no),
+      first_name = as.character(first_name),
+      last_name = as.character(last_name),
+      full_name = stringr::str_squish(paste(
+        dplyr::coalesce(first_name, ""),
+        dplyr::coalesce(last_name, "")
+      )),
+      display_name = dplyr::coalesce(
+        dplyr::na_if(full_name, ""),
+        dplyr::na_if(as.character(popular_name), ""),
+        dplyr::na_if(as.character(team_name), ""),
+        athlete_id
+      ),
+      player_gender = normalize_event_gender(gender),
+      player_federation = as.character(federation_code),
+      player_nationality = as.character(nationality)
+    ) |>
+    dplyr::select(
+      athlete_id,
+      display_name,
+      first_name,
+      last_name,
+      popular_name,
+      team_name,
+      player_gender,
+      player_federation,
+      player_nationality,
+      plays_beach,
+      active_beach,
+      dplyr::everything(),
+      -no,
+      -gender,
+      -federation_code,
+      -nationality,
+      -full_name
+    ) |>
+    dplyr::distinct(athlete_id, .keep_all = TRUE)
+}
