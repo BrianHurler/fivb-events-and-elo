@@ -92,6 +92,10 @@ Tournament Nos 1008, 1009, 2060, 2061, 2069, 3305, 3306, 5417, 5419, 6271, 7003,
 
 These overrides include several events whose VIS organizer metadata are blank or non-confederation codes. Tournament Nos 6269 and 6270 were reviewed and excluded because they are African Commonwealth Games qualifiers, consistent with the general CAVB/Africa exclusion.
 
+### 2026-09-25 — Non-competition VIS records are explicitly excluded
+
+Tournament No 505 (`Congress 2010`) is excluded after review because it is not a beach-volleyball competition despite appearing in the VIS tournament archive.
+
 ## Open decisions before production use
 
 ### Exact production Elo universe
