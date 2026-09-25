@@ -1,20 +1,20 @@
-profile_name: senior_fivb_broad_v1
+profile_name: senior_fivb_plus_continental_2008_v1
 
 selection:
   genders:
     - M
     - W
 
-  # Empty/null dates mean use the full available archive.
-  start_date: null
+  # VIS coverage before 2008 is retained in the source archive but is not
+  # trusted for Elo construction.
+  start_date: 2008-01-01
   end_date: null
 
   # Qualification matches are part of the tournament competition history and
   # are included by default. This can be changed for a frozen downstream profile.
   include_qualification: true
 
-  # Initial broad senior international universe. Narrow research-specific
-  # profiles should be frozen explicitly rather than changing raw history.
+  # Senior FIVB / World Tour / Beach Pro Tour competition universe.
   include_event_classes:
     - Olympic Games
     - World Championship
@@ -32,6 +32,25 @@ selection:
     - Open
     - Challenger
     - World Series
+
+  # Senior continental competitions are included only for the selected
+  # confederations below. Youth age-group classes and zonal tours remain out.
+  include_continental_event_classes:
+    - Continental Championship
+    - Continental Tour
+    - Continental Cup
+    - Other Continental
+    - CEV Masters
+
+  include_continental_organizer_codes:
+    - AVC
+    - NORCECA
+    - CSV
+    - CEV
+
+  # Africa is intentionally outside this Elo profile.
+  exclude_continental_organizer_codes:
+    - CAVB
 
   # VIS tournament No values. Manual include wins over class selection;
   # manual exclude is applied last.
