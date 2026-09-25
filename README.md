@@ -181,6 +181,8 @@ Before this repository becomes the source of truth for elite pathways:
 
 The important architectural separation is that **VIS history, tournament classification, Elo eligibility, and elite-pathways event difficulty remain distinct layers**.
 
+See `docs/decision-log.md` for accepted architecture, unresolved methodological choices, and the gate before this repository should change the elite-pathways model.
+
 
 ## Relationship to elite pathways
 
