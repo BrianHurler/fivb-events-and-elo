@@ -801,8 +801,8 @@ legacy_only_raw <- legacy_overlap |>
         no_tournament = as.integer(tournament_no),
         event_class,
         tournament_name_current = tournament_name,
-        elo_tournament_status,
-        elo_tournament_reason
+        elo_tournament_status = elo_selection_status,
+        elo_tournament_reason = elo_selection_reason
       ),
     by = "no_tournament"
   ) |>
