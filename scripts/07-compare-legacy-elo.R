@@ -5,171 +5,107 @@ assert_project_root()
 check_packages()
 source_project_functions()
 
-# Select the intended named profile before loading the cloudyr AWS packages.
-aws_profile <- Sys.getenv("AWS_PROFILE", unset = "brian-hurler")
-aws_region <- Sys.getenv("AWS_DEFAULT_REGION", unset = "us-west-1")
-
-if (aws_profile == "") aws_profile <- "brian-hurler"
-if (aws_region == "") aws_region <- "us-west-1"
-
-Sys.setenv(
-  AWS_PROFILE = aws_profile,
-  AWS_DEFAULT_REGION = aws_region
-)
-
-if (!requireNamespace("aws.signature", quietly = TRUE)) {
-  stop(
-    "Stage 07 requires the optional package 'aws.signature'.",
-    call. = FALSE
+is_ec2_environment <- function() {
+  files <- c(
+    "/sys/hypervisor/uuid",
+    "/sys/devices/virtual/dmi/id/product_uuid"
   )
+  values <- unlist(
+    lapply(
+      files[file.exists(files)],
+      function(path) {
+        tryCatch(readLines(path, n = 1L, warn = FALSE), error = function(e) "")
+      }
+    ),
+    use.names = FALSE
+  )
+  any(grepl("^ec2", values, ignore.case = TRUE))
 }
 
-if (!requireNamespace("aws.s3", quietly = TRUE)) {
-  stop(
-    "Stage 07 requires the optional package 'aws.s3'. Install it with install.packages('aws.s3').",
-    call. = FALSE
+configure_aws_environment <- function(config) {
+  Sys.setenv(
+    AWS_DEFAULT_REGION = config$region,
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
   )
+  if (is_ec2_environment()) {
+    Sys.unsetenv("AWS_PROFILE")
+  } else {
+    Sys.setenv(AWS_PROFILE = config$local_aws_profile)
+  }
+  invisible(TRUE)
 }
 
-# aws.signature may resolve credentials during package load. Explicitly re-read
-# the requested named profile so an already-loaded default credential cannot
-# silently win.
-credential_result <- try(
-  aws.signature::use_credentials(profile = aws_profile),
-  silent = TRUE
-)
+download_s3_file <- function(bucket, object, region, destination) {
+  if (!requireNamespace("aws.s3", quietly = TRUE)) {
+    stop(
+      "Package `aws.s3` is required to download the canonical Elo history.",
+      call. = FALSE
+    )
+  }
 
-if (inherits(credential_result, "try-error")) {
-  stop(
-    "Could not load AWS credentials for profile '",
-    aws_profile,
-    "': ",
-    as.character(credential_result),
-    call. = FALSE
+  dir.create(dirname(destination), recursive = TRUE, showWarnings = FALSE)
+  tryCatch(
+    aws.s3::save_object(
+      object = object,
+      bucket = bucket,
+      file = destination,
+      region = region
+    ),
+    error = function(error) {
+      stop(
+        "Unable to download s3://", bucket, "/", object,
+        " using AWS profile `",
+        Sys.getenv("AWS_PROFILE", unset = "<EC2 IAM role>"),
+        "` in region `", region, "`: ",
+        conditionMessage(error),
+        call. = FALSE
+      )
+    }
   )
+  downloaded <- file.exists(destination) &&
+    !is.na(file.info(destination)$size) &&
+    file.info(destination)$size > 0
+  if (!downloaded) {
+    stop(
+      "Unable to download s3://", bucket, "/", object,
+      " using AWS profile `",
+      Sys.getenv("AWS_PROFILE", unset = "<EC2 IAM role>"),
+      "` in region `", region, "`.",
+      call. = FALSE
+    )
+  }
+  destination
 }
 
-message(
-  "Using AWS profile '", aws_profile,
-  "' in region '", aws_region, "'."
+legacy_config <- list(
+  bucket = "usavbeach",
+  object = "elo/long_matches_k_factor_30.rda",
+  object_name = "long_matches",
+  region = "us-west-1",
+  local_aws_profile = "brian-hurler"
 )
 
-legacy_bucket <- "usavbeach"
-legacy_key <- "elo/long_matches_k_factor_30.rda"
+legacy_bucket <- legacy_config$bucket
+legacy_key <- legacy_config$object
 legacy_cache <- "data-raw/long_matches_k_factor_30.rda"
 
 dir.create("data-raw", recursive = TRUE, showWarnings = FALSE)
 dir.create("data-processed", recursive = TRUE, showWarnings = FALSE)
 
-extract_xml_error <- function(x) {
-  txt <- tryCatch(
-    {
-      if (is.raw(x)) {
-        rawToChar(x)
-      } else if (is.character(x)) {
-        paste(x, collapse = "")
-      } else {
-        return(NULL)
-      }
-    },
-    error = function(e) NULL
-  )
-
-  if (is.null(txt) || !grepl("^\\s*<", txt)) return(NULL)
-
-  doc <- tryCatch(xml2::read_xml(txt), error = function(e) NULL)
-  if (is.null(doc)) return(list(code = "XMLResponse", message = txt))
-
-  node_text <- function(xpath) {
-    node <- xml2::xml_find_first(doc, xpath)
-    if (inherits(node, "xml_missing")) return(NA_character_)
-    xml2::xml_text(node)
-  }
-
-  list(
-    code = node_text(".//*[local-name()='Code']"),
-    message = node_text(".//*[local-name()='Message']"),
-    request_id = node_text(".//*[local-name()='RequestId']")
-  )
-}
-
-cached_xml_error <- function(path) {
-  if (!file.exists(path) || file.info(path)$size == 0) return(NULL)
-
-  n <- min(as.integer(file.info(path)$size), 8192L)
-  con <- file(path, open = "rb")
-  on.exit(close(con), add = TRUE)
-  bytes <- readBin(con, what = "raw", n = n)
-
-  extract_xml_error(bytes)
-}
-
-cache_error <- cached_xml_error(legacy_cache)
-if (!is.null(cache_error)) {
-  message(
-    "Discarding invalid cached S3 response (",
-    dplyr::coalesce(cache_error$code, "XML"),
-    "): ",
-    dplyr::coalesce(cache_error$message, "unknown S3 error")
-  )
-  unlink(legacy_cache)
-}
+configure_aws_environment(legacy_config)
 
 if (!file.exists(legacy_cache) || force_refresh()) {
-  message("Downloading legacy Elo artifact from S3...")
-
-  raw_object <- aws.s3::get_object(
-    object = legacy_key,
-    bucket = legacy_bucket
+  message(
+    "Downloading legacy Elo artifact from S3 using AWS profile '",
+    Sys.getenv("AWS_PROFILE", unset = "<EC2 IAM role>"),
+    "'..."
   )
-
-  s3_error <- extract_xml_error(raw_object)
-  if (!is.null(s3_error)) {
-    stop(
-      "S3 returned XML instead of the legacy RDA. Code: ",
-      dplyr::coalesce(s3_error$code, "unknown"),
-      "; message: ",
-      dplyr::coalesce(s3_error$message, "unknown"),
-      if (!is.na(s3_error$request_id)) {
-        paste0("; request_id: ", s3_error$request_id)
-      } else {
-        ""
-      },
-      call. = FALSE
-    )
-  }
-
-  if (!is.raw(raw_object)) {
-    stop(
-      "Unexpected S3 response type: ",
-      paste(class(raw_object), collapse = "/"),
-      ". Expected raw RDA bytes.",
-      call. = FALSE
-    )
-  }
-
-  temp_cache <- paste0(legacy_cache, ".download")
-  writeBin(raw_object, temp_cache)
-
-  validation_env <- new.env(parent = emptyenv())
-  validation <- try(
-    load(temp_cache, envir = validation_env),
-    silent = TRUE
+  download_s3_file(
+    legacy_config$bucket,
+    legacy_config$object,
+    legacy_config$region,
+    legacy_cache
   )
-
-  if (inherits(validation, "try-error")) {
-    unlink(temp_cache)
-    stop(
-      "Downloaded S3 object is not a valid RDA: ",
-      as.character(validation),
-      call. = FALSE
-    )
-  }
-
-  if (!file.rename(temp_cache, legacy_cache)) {
-    unlink(temp_cache)
-    stop("Could not move validated legacy RDA into cache.", call. = FALSE)
-  }
 } else {
   message("Using cached legacy Elo artifact: ", legacy_cache)
 }
