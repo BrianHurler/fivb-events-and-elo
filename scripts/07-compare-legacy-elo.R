@@ -959,6 +959,11 @@ legacy_formula_base <- legacy |>
     },
     actual_score = suppressWarnings(as.numeric(result)),
     elo_before = as.numeric(athlete_elo_before),
+    legacy_stored_change = if ("athlete_elo_change" %in% names(legacy)) {
+      as.numeric(athlete_elo_change)
+    } else {
+      as.numeric(athlete_elo_after) - as.numeric(athlete_elo_before)
+    },
     elo_after = as.numeric(athlete_elo_after),
     k_factor = if ("k_factor" %in% names(legacy)) {
       as.numeric(k_factor)
@@ -994,6 +999,7 @@ legacy_formula_check <- legacy_formula_base |>
     tournament_category,
     actual_score,
     elo_before,
+    legacy_stored_change,
     elo_after,
     k_factor
   ) |>
@@ -1051,6 +1057,88 @@ readr::write_csv(
   "data-processed/legacy_elo_formula_outlier_summary.csv"
 )
 
+# Link formula-outlier matches back to the canonical VIS match record when the
+# cross-source fingerprint mapping is available. This distinguishes genuine
+# formula differences from legacy special handling of injuries/forfeits/etc.
+formula_outlier_match_map <- legacy_formula_outliers |>
+  dplyr::distinct(legacy_match_id) |>
+  dplyr::left_join(
+    shared_match_map |>
+      dplyr::select(legacy_match_id, new_match_no),
+    by = "legacy_match_id"
+  ) |>
+  dplyr::left_join(
+    raw_matches |>
+      dplyr::transmute(
+        new_match_no = as.character(no),
+        vis_result_type_code = suppressWarnings(as.integer(result_type)),
+        vis_result_type_label = decode_beach_match_result_type(result_type),
+        vis_match_points_a = suppressWarnings(as.numeric(match_points_a)),
+        vis_match_points_b = suppressWarnings(as.numeric(match_points_b))
+      ) |>
+      dplyr::distinct(new_match_no, .keep_all = TRUE),
+    by = "new_match_no"
+  )
+
+legacy_formula_outliers <- legacy_formula_outliers |>
+  dplyr::left_join(
+    formula_outlier_match_map,
+    by = "legacy_match_id"
+  ) |>
+  dplyr::mutate(
+    stored_change_is_zero = abs(legacy_stored_change) <= 1e-6
+  )
+
+readr::write_csv(
+  legacy_formula_outliers,
+  "data-processed/legacy_elo_formula_outliers.csv"
+)
+
+formula_outlier_result_type_summary <- legacy_formula_outliers |>
+  dplyr::distinct(
+    legacy_match_id,
+    new_match_no,
+    vis_result_type_code,
+    vis_result_type_label
+  ) |>
+  dplyr::count(
+    vis_result_type_code,
+    vis_result_type_label,
+    sort = TRUE,
+    name = "matches"
+  )
+
+readr::write_csv(
+  formula_outlier_result_type_summary,
+  "data-processed/legacy_elo_formula_outliers_by_result_type.csv"
+)
+
+formula_outlier_row_pattern <- legacy_formula_outliers |>
+  dplyr::summarise(
+    outlier_rows = dplyr::n(),
+    outlier_matches = dplyr::n_distinct(legacy_match_id),
+    winner_outlier_rows = sum(actual_score == 1, na.rm = TRUE),
+    loser_outlier_rows = sum(actual_score == 0, na.rm = TRUE),
+    zero_stored_change_rows = sum(stored_change_is_zero, na.rm = TRUE),
+    share_zero_stored_change = mean(stored_change_is_zero, na.rm = TRUE)
+  )
+
+formula_outlier_match_pattern <- legacy_formula_outliers |>
+  dplyr::count(
+    legacy_match_id,
+    name = "outlier_rows_in_match"
+  ) |>
+  dplyr::count(
+    outlier_rows_in_match,
+    name = "matches"
+  ) |>
+  dplyr::arrange(outlier_rows_in_match)
+
+readr::write_csv(
+  formula_outlier_match_pattern,
+  "data-processed/legacy_elo_formula_outlier_match_pattern.csv"
+)
+
 legacy_formula_summary <- tibble::tibble(
   metric = c(
     "eligible_athlete_match_rows",
@@ -1087,6 +1175,15 @@ readr::write_csv(
 message("\nLegacy K=30 Elo formula parity:")
 print(legacy_formula_summary, n = Inf)
 
+message("\nLegacy formula outliers by VIS result type:")
+print(formula_outlier_result_type_summary, n = Inf)
+
+message("\nLegacy formula outlier row pattern:")
+print(formula_outlier_row_pattern, n = Inf)
+
+message("\nLegacy formula outlier rows per match:")
+print(formula_outlier_match_pattern, n = Inf)
+
 message("\nLargest legacy formula-parity outliers:")
 print(
   legacy_formula_outliers |>
@@ -1098,9 +1195,12 @@ print(
       tournament,
       athlete_id,
       actual_score,
+      vis_result_type_code,
+      vis_result_type_label,
       elo_before,
       opponent_team_mean_elo,
       k_factor,
+      legacy_stored_change,
       elo_after,
       reconstructed_after,
       formula_error,
