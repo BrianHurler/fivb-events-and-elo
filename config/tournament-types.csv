@@ -34,6 +34,7 @@ type_value,type_name,event_class,senior_international
 33,WorldTourFinals,World Tour Finals,TRUE
 34,ZonalTour,Zonal Tour,FALSE
 35,Test,Test,FALSE
+36,CevSnowTour,Snow Volleyball,FALSE
 38,WorldTour5Star,5-Star,TRUE
 39,WorldTour4Star,4-Star,TRUE
 40,WorldTour3Star,3-Star,TRUE
@@ -41,6 +42,7 @@ type_value,type_name,event_class,senior_international
 42,WorldTour1Star,1-Star,TRUE
 43,YouthOlympicGames,Youth Olympic Games,FALSE
 44,MultiSportsGames,Multi-Sport Games,FALSE
+45,SnowVolleyballNationalChampionship,Snow Volleyball,FALSE
 46,NationalTourU22,National Tour U22,FALSE
 47,ContinentalChampionshipU21,Continental Championship U21,FALSE
 48,ContinentalChampionshipU19,Continental Championship U19,FALSE
