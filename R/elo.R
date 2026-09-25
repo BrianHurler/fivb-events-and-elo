@@ -304,6 +304,15 @@ prepare_elo_matches <- function(matches, tournaments, config) {
         no_player_a2 > 0 &
         no_player_b1 > 0 &
         no_player_b2 > 0,
+      unique_player_ids = dplyr::coalesce(
+        no_player_a1 != no_player_a2 &
+        no_player_a1 != no_player_b1 &
+        no_player_a1 != no_player_b2 &
+        no_player_a2 != no_player_b1 &
+        no_player_a2 != no_player_b2 &
+        no_player_b1 != no_player_b2,
+        FALSE
+      ),
       valid_team_ids = no_team_a > 0 & no_team_b > 0,
       not_deleted = is.na(deleted_dt) | deleted_dt == "",
       is_qualification = stringr::str_detect(
@@ -319,6 +328,7 @@ prepare_elo_matches <- function(matches, tournaments, config) {
     dplyr::filter(
       decisive_result,
       valid_player_ids,
+      unique_player_ids,
       valid_team_ids,
       not_deleted,
       gender %in% unlist(config$selection$genders)
