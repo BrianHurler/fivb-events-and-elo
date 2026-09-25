@@ -250,6 +250,7 @@ prepare_elo_matches <- function(matches, tournaments, config) {
     matches,
     list(
       deleted_dt = NA_character_,
+      result_type = NA_integer_,
       round_name = NA_character_,
       round_code = NA_character_,
       local_time = NA_character_,
@@ -294,6 +295,8 @@ prepare_elo_matches <- function(matches, tournaments, config) {
     dplyr::left_join(tournament_context, by = "no_tournament") |>
     dplyr::mutate(
       local_date = as.Date(local_date),
+      result_type_code = suppressWarnings(as.integer(result_type)),
+      result_type_label = decode_beach_match_result_type(result_type),
       decisive_result = !is.na(match_points_a) &
         !is.na(match_points_b) &
         match_points_a != match_points_b,
@@ -324,12 +327,18 @@ prepare_elo_matches <- function(matches, tournaments, config) {
   include_match_nos <- as.integer(unlist(config$selection$include_match_nos))
   exclude_match_nos <- as.integer(unlist(config$selection$exclude_match_nos))
   exclude_nos <- as.integer(unlist(config$selection$exclude_tournament_nos))
+  include_result_types <- as.integer(unlist(config$selection$include_result_types))
 
   out <- out |>
     dplyr::filter(
       elo_tournament_status == "include" |
         no %in% include_match_nos
     )
+
+  if (length(include_result_types) > 0L) {
+    out <- out |>
+      dplyr::filter(result_type_code %in% include_result_types)
+  }
 
   if (length(exclude_nos) > 0L) {
     out <- out |>
