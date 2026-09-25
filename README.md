@@ -103,12 +103,17 @@ Unresolved legacy tournaments are deliberately surfaced as `review`; they are no
 
 `config/elo.yml` controls which matches feed Elo. The current profile begins on 2008-01-01 because earlier VIS match coverage is not considered reliable enough for Elo construction. The raw VIS archive remains broader.
 
-The profile includes the selected senior FIVB / World Tour / Beach Pro Tour classes plus senior continental events from AVC, NORCECA, CSV, and CEV. CAVB events are explicitly excluded from this Elo profile. Youth continental classes and zonal tours remain excluded.
+The profile includes the selected senior FIVB / World Tour / Beach Pro Tour classes, including Futures, plus senior continental events from AVC, NORCECA, CSV, and CEV. CAVB events are explicitly excluded from this Elo profile except for any tournament numbers deliberately entered as manual inclusions.
+
+Youth events are a hard exclusion. In addition to VIS youth event classes, tournament names/titles containing U15 through U23 (including spaced/hyphenated variants such as U23 or U-23) or equivalent Under-15 through Under-23 markers are excluded before class-based or manual inclusion. This prevents senior-looking classes such as `Continental Tour` from admitting age-group events.
+
+When VIS organizer metadata are missing, the selector can infer AVC, NORCECA, CSV, CEV, or CAVB from tournament name/title text. Ambiguous continental events remain in `review`.
 
 Selection supports:
 
-- included FIVB event classes;
+- included FIVB event classes, including Futures;
 - selected senior continental event classes and confederation organizer codes;
+- a hard U15-U23 youth-title/class exclusion;
 - manually included tournament IDs;
 - manually excluded tournament IDs;
 - manually included match IDs;
