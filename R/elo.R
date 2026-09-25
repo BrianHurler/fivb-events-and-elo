@@ -6,7 +6,7 @@ as_date_or_null <- function(x) {
 add_missing_columns <- function(data, defaults) {
   for (nm in names(defaults)) {
     if (!nm %in% names(data)) {
-      data[[nm]] <- defaults[[nm]]
+      data[[nm]] <- rep(defaults[[nm]], nrow(data))
     }
   }
   data
