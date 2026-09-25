@@ -29,7 +29,8 @@ The raw VIS layer is intentionally broader than any one downstream research proj
 │   └── elo.R
 ├── config/
 │   ├── elo.yml
-│   └── tournament-types.csv
+│   ├── tournament-types.csv
+│   └── tournament-overrides.csv
 ├── scripts/
 │   ├── _common.R
 │   ├── 00-setup.R
@@ -79,7 +80,7 @@ VIS tournament type is the first classification layer. The mapping in `config/to
 
 The raw VIS type remains available even when a practical class is added.
 
-This repository should eventually become the single place where any manual historical event overrides are documented.
+Manual historical corrections belong in `config/tournament-overrides.csv`. An override is keyed by the stable VIS tournament number, replaces only the practical `event_class`, records a note, and is surfaced as `classification_source = "manual_override"`. This keeps one auditable home for the classification decisions that were previously repeated across projects.
 
 ## Elo selection
 
@@ -90,12 +91,14 @@ Selection supports:
 - included event classes;
 - manually included tournament IDs;
 - manually excluded tournament IDs;
+- manually included match IDs;
+- manually excluded match IDs;
 - men/women;
 - optional start/end dates;
 - qualification inclusion;
 - Elo K-factor and starting rating.
 
-A downstream project should consume a named/frozen selection rather than edit historical data.
+Explicit includes are additive to the class-based universe; explicit excludes are applied last. A downstream project should consume a named/frozen selection rather than edit historical data.
 
 ## Elo methodology
 
@@ -177,3 +180,10 @@ Before this repository becomes the source of truth for elite pathways:
 6. only then evaluate whether the new event universe or rebuilt Elo should alter the elite-pathways event-strength model.
 
 The important architectural separation is that **VIS history, tournament classification, Elo eligibility, and elite-pathways event difficulty remain distinct layers**.
+
+
+## Relationship to elite pathways
+
+This repository should own **source history, classification, and Elo construction**. The elite-pathways repository should continue to own the separate research question of how tournament strength is measured and which achievements count toward a pathway endpoint.
+
+A future integration should therefore pass stable artifacts such as classified tournaments, selected matches, and athlete Elo history into elite pathways. It should not copy VIS request code or maintain a second tournament taxonomy there.
