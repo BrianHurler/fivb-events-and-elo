@@ -22,6 +22,7 @@ selection:
     - Pro Tour Finals
     - Elite16
     - Challenge
+    - Futures
     - Grand Slam
     - Major Series
     - 5-Star
@@ -54,7 +55,21 @@ selection:
 
   # VIS tournament No values. Manual include wins over class selection;
   # manual exclude is applied last.
-  include_tournament_nos: []
+  include_tournament_nos:
+    - 1008
+    - 1009
+    - 2060
+    - 2061
+    - 2069
+    - 3305
+    - 3306
+    - 5417
+    - 5419
+    - 6269
+    - 6270
+    - 6271
+    - 7003
+    - 7496
   exclude_tournament_nos: []
 
   # VIS BeachMatch No values. Explicit match includes join the selected universe;
