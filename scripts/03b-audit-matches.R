@@ -84,7 +84,7 @@ by_result_type <- matches_audit |>
 
 by_elo_class <- matches_audit |>
   dplyr::filter(elo_selection_status == "include") |>
-  dplyr::count(gender_classified, event_class, sort = TRUE, name = "matches")
+  dplyr::count(gender, event_class, sort = TRUE, name = "matches")
 
 readr::write_csv(
   overview,
