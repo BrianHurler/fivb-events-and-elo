@@ -32,11 +32,12 @@ vis_parse_nodes <- function(xml_text, node_name) {
   })
 
   names(out) <- snake_case_names(names(out))
-  readr::type_convert(
-    out,
-    na = c("", "NULL", "null"),
-    trim_ws = TRUE,
-    show_col_types = FALSE
+  suppressMessages(
+    readr::type_convert(
+      out,
+      na = c("", "NULL", "null"),
+      trim_ws = TRUE
+    )
   )
 }
 
