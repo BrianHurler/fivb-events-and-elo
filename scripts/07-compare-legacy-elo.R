@@ -1063,21 +1063,30 @@ readr::write_csv(
 formula_outlier_match_map <- legacy_formula_outliers |>
   dplyr::distinct(legacy_match_id) |>
   dplyr::left_join(
-    shared_match_map |>
-      dplyr::select(legacy_match_id, new_match_no),
+    legacy_overlap |>
+      dplyr::select(
+        legacy_match_id,
+        raw_match_no,
+        in_raw_archive,
+        in_new_elo,
+        disposition
+      ),
     by = "legacy_match_id"
   ) |>
   dplyr::left_join(
     raw_matches |>
       dplyr::transmute(
-        new_match_no = as.character(no),
+        raw_match_no = as.character(no),
         vis_result_type_code = suppressWarnings(as.integer(result_type)),
         vis_result_type_label = decode_beach_match_result_type(result_type),
         vis_match_points_a = suppressWarnings(as.numeric(match_points_a)),
-        vis_match_points_b = suppressWarnings(as.numeric(match_points_b))
+        vis_match_points_b = suppressWarnings(as.numeric(match_points_b)),
+        vis_round_name = as.character(round_name),
+        vis_round_code = as.character(round_code),
+        vis_tournament_no = as.integer(no_tournament)
       ) |>
-      dplyr::distinct(new_match_no, .keep_all = TRUE),
-    by = "new_match_no"
+      dplyr::distinct(raw_match_no, .keep_all = TRUE),
+    by = "raw_match_no"
   )
 
 legacy_formula_outliers <- legacy_formula_outliers |>
@@ -1097,7 +1106,10 @@ readr::write_csv(
 formula_outlier_result_type_summary <- legacy_formula_outliers |>
   dplyr::distinct(
     legacy_match_id,
-    new_match_no,
+    raw_match_no,
+    in_raw_archive,
+    in_new_elo,
+    disposition,
     vis_result_type_code,
     vis_result_type_label
   ) |>
@@ -1195,6 +1207,10 @@ print(
       tournament,
       athlete_id,
       actual_score,
+      raw_match_no,
+      in_raw_archive,
+      in_new_elo,
+      disposition,
       vis_result_type_code,
       vis_result_type_label,
       elo_before,
