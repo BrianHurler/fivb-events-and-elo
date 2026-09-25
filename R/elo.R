@@ -3,6 +3,15 @@ as_date_or_null <- function(x) {
   as.Date(x)
 }
 
+add_missing_columns <- function(data, defaults) {
+  for (nm in names(defaults)) {
+    if (!nm %in% names(data)) {
+      data[[nm]] <- defaults[[nm]]
+    }
+  }
+  data
+}
+
 prepare_elo_matches <- function(matches, tournaments, config) {
   required_match <- c(
     "no", "no_tournament", "local_date",
@@ -15,6 +24,18 @@ prepare_elo_matches <- function(matches, tournaments, config) {
     stop("Match data missing required fields: ", paste(missing_match, collapse = ", "))
   }
 
+  matches <- add_missing_columns(
+    matches,
+    list(
+      deleted_dt = NA_character_,
+      round_name = NA_character_,
+      round_code = NA_character_,
+      local_time = NA_character_,
+      team_a_federation_code = NA_character_,
+      team_b_federation_code = NA_character_
+    )
+  )
+
   required_tournament <- c("no", "gender", "event_class")
   missing_tournament <- setdiff(required_tournament, names(tournaments))
   if (length(missing_tournament) > 0L) {
@@ -23,6 +44,16 @@ prepare_elo_matches <- function(matches, tournaments, config) {
       paste(missing_tournament, collapse = ", ")
     )
   }
+
+  tournaments <- add_missing_columns(
+    tournaments,
+    list(
+      name = NA_character_,
+      title = NA_character_,
+      start_date_qualification = NA_character_,
+      start_date_main_draw = NA_character_
+    )
+  )
 
   tournament_context <- tournaments |>
     dplyr::transmute(
@@ -51,11 +82,7 @@ prepare_elo_matches <- function(matches, tournaments, config) {
         no_player_b1 > 0 &
         no_player_b2 > 0,
       valid_team_ids = no_team_a > 0 & no_team_b > 0,
-      not_deleted = if ("deleted_dt" %in% names(.)) {
-        is.na(deleted_dt) | deleted_dt == ""
-      } else {
-        TRUE
-      },
+      not_deleted = is.na(deleted_dt) | deleted_dt == "",
       is_qualification = stringr::str_detect(
         stringr::str_to_lower(
           paste(
