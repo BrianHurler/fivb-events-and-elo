@@ -95,7 +95,34 @@ if (length(cache_files) == 0L) {
   )
 }
 
-matches <- purrr::map_dfr(cache_files, readRDS)
+# Individual VIS tournament responses can infer the same XML attribute with
+# different R types (for example, RoundCode may be numeric in one tournament
+# and character in another). Normalize cached responses to character first,
+# bind the full archive, then infer types once across the combined dataset.
+cache_rows <- purrr::map(cache_files, function(path) {
+  x <- readRDS(path)
+
+  if (nrow(x) == 0L) {
+    return(x)
+  }
+
+  dplyr::mutate(
+    x,
+    dplyr::across(dplyr::everything(), as.character)
+  )
+})
+
+matches <- dplyr::bind_rows(cache_rows)
+
+if (nrow(matches) > 0L) {
+  matches <- suppressMessages(
+    readr::type_convert(
+      matches,
+      na = c("", "NULL", "null"),
+      trim_ws = TRUE
+    )
+  )
+}
 
 if (!"no" %in% names(matches)) {
   stop("Cached VIS match data do not contain the canonical match field 'No'.", call. = FALSE)
