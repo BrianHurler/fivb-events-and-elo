@@ -14,6 +14,11 @@ selection:
   # are included by default. This can be changed for a frozen downstream profile.
   include_qualification: true
 
+  # Only normally completed matches move Elo. Forfeits, injuries, out results,
+  # and disqualifications remain in the raw archive but are excluded from ratings.
+  include_result_types:
+    - 0
+
   # Senior FIVB / World Tour / Beach Pro Tour competition universe.
   include_event_classes:
     - Olympic Games
