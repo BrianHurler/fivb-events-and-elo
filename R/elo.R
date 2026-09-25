@@ -503,7 +503,12 @@ calculate_athlete_elo <- function(matches, initial_rating = 1500,
 
   dplyr::bind_rows(result) |>
     dplyr::group_by(athlete_id) |>
-    dplyr::arrange(date, local_time, match_no, .by_group = TRUE) |>
+    dplyr::arrange(
+      date,
+      dplyr::coalesce(as.character(local_time), "00:00:00"),
+      match_no,
+      .by_group = TRUE
+    ) |>
     dplyr::mutate(career_match_number = dplyr::row_number()) |>
     dplyr::ungroup()
 }
@@ -512,7 +517,11 @@ build_current_elo <- function(history) {
   if (nrow(history) == 0L) return(tibble::tibble())
 
   history |>
-    dplyr::arrange(date, local_time, match_no) |>
+    dplyr::arrange(
+      date,
+      dplyr::coalesce(as.character(local_time), "00:00:00"),
+      match_no
+    ) |>
     dplyr::group_by(athlete_id) |>
     dplyr::slice_tail(n = 1L) |>
     dplyr::ungroup() |>
