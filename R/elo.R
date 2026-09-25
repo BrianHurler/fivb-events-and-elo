@@ -83,16 +83,39 @@ build_elo_tournament_audit <- function(tournaments, config) {
       ),
       event_year = suppressWarnings(as.integer(format(start_date, "%Y"))),
       organizer_code_normalized = toupper(trimws(as.character(organizer_code))),
+      tournament_text = toupper(paste(
+        dplyr::coalesce(as.character(name), ""),
+        dplyr::coalesce(as.character(title), "")
+      )),
+      continental_confederation = dplyr::case_when(
+        organizer_code_normalized %in% c("AVC", "NORCECA", "CSV", "CEV", "CAVB") ~
+          organizer_code_normalized,
+        stringr::str_detect(tournament_text, "\\bNORCECA\\b") ~ "NORCECA",
+        stringr::str_detect(tournament_text, "\\bAVC\\b") ~ "AVC",
+        stringr::str_detect(tournament_text, "\\bCSV\\b") ~ "CSV",
+        stringr::str_detect(tournament_text, "\\bCEV\\b") ~ "CEV",
+        stringr::str_detect(tournament_text, "\\bCAVB\\b|\\bAFRICAN\\b") ~ "CAVB",
+        TRUE ~ NA_character_
+      ),
+      youth_title_marker = stringr::str_detect(
+        tournament_text,
+        "(^|[^A-Z0-9])U\\s*-?\\s*(15|16|17|18|19|20|21|22|23)([^0-9]|$)|\\bUNDER\\s*-?\\s*(15|16|17|18|19|20|21|22|23)\\b"
+      ),
+      youth_class_marker = stringr::str_detect(
+        dplyr::coalesce(as.character(event_class), ""),
+        "U(15|16|17|18|19|20|21|22|23)|Youth|Junior"
+      ),
+      youth_excluded = youth_title_marker | youth_class_marker,
       gender_allowed = gender %in% allowed_genders,
       class_selected = !is.na(event_class) & event_class %in% include_classes,
       continental_candidate =
         !is.na(event_class) & event_class %in% continental_classes,
       continental_selected =
         continental_candidate &
-        organizer_code_normalized %in% continental_organizers,
+        continental_confederation %in% continental_organizers,
       continental_explicit_exclude =
         continental_candidate &
-        organizer_code_normalized %in% continental_excluded_organizers,
+        continental_confederation %in% continental_excluded_organizers,
       continental_unknown_organizer =
         continental_candidate &
         !continental_selected &
@@ -117,6 +140,7 @@ build_elo_tournament_audit <- function(tournaments, config) {
         manual_exclude ~ "exclude",
         !gender_allowed ~ "exclude",
         !within_date_window ~ "exclude",
+        youth_excluded ~ "exclude",
         manual_include ~ "include",
         class_selected ~ "include",
         continental_selected ~ "include",
@@ -129,17 +153,18 @@ build_elo_tournament_audit <- function(tournaments, config) {
         manual_exclude ~ "manual tournament exclusion",
         !gender_allowed ~ "gender not selected by Elo profile",
         !within_date_window ~ "outside Elo profile date window",
+        youth_excluded ~ "youth age-group marker in tournament title/class",
         manual_include ~ "manual tournament inclusion",
         class_selected ~ paste0("selected FIVB event class: ", event_class),
         continental_selected ~ paste0(
           "selected continental event: ",
           event_class,
           " / ",
-          organizer_code_normalized
+          continental_confederation
         ),
         continental_explicit_exclude ~ paste0(
           "continental organizer explicitly excluded: ",
-          organizer_code_normalized
+          continental_confederation
         ),
         continental_unknown_organizer ~ paste0(
           "continental event with unrecognized organizer: ",
@@ -167,6 +192,10 @@ build_elo_tournament_audit <- function(tournaments, config) {
       organizer_type,
       organizer_code,
       organizer_code_normalized,
+      continental_confederation,
+      youth_title_marker,
+      youth_class_marker,
+      youth_excluded,
       vis_type_raw,
       vis_type_name,
       classification_source,
