@@ -62,7 +62,7 @@ classify_beach_tournaments <- function(tournaments, type_map) {
     tournaments$title
   )
 
-  use_inferred <- is.na(mapped_class) | mapped_class == "Other"
+  use_inferred <- is.na(mapped_class)
 
   tournaments |>
     dplyr::mutate(
