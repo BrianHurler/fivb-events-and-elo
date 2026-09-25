@@ -35,11 +35,13 @@ The raw VIS layer is intentionally broader than any one downstream research proj
 │   ├── _common.R
 │   ├── 00-setup.R
 │   ├── 01-pull-events.R
+│   ├── 01b-pull-players.R
 │   ├── 02-classify-tournaments.R
 │   ├── 02b-build-elo-tournament-universe.R
 │   ├── 03-pull-matches.R
 │   ├── 04-build-elo-input.R
 │   ├── 05-calculate-elo.R
+│   ├── 05b-enrich-elo-players.R
 │   ├── 06-validate-outputs.R
 │   └── run-all.R
 ├── data-raw/                 # ignored
@@ -58,6 +60,8 @@ Stage 01 requests both:
 
 - `GetEventList` — the general VIS event container history;
 - `GetBeachTournamentList` — the beach-tournament history used as the canonical competition table.
+
+Stage 01b requests the public VIS player list filtered to beach-volleyball players and builds `vis_players.parquet`. The stable VIS player `No` is stored as `athlete_id` and is the canonical join key for names and federation metadata.
 
 Stage 02b materializes the proposed tournament universe for Elo review before any match-level Elo selection. Stage 03 requests `GetBeachMatchList` separately for each beach tournament using its VIS `No` identifier.
 
@@ -189,6 +193,7 @@ After a complete run:
 data-processed/vis_events.parquet
 data-processed/beach_tournaments.parquet
 data-processed/beach_tournaments_classified.parquet
+data-processed/vis_players.parquet
 data-processed/elo_tournaments_proposed.csv
 data-processed/elo_tournament_selection_audit.csv
 data-processed/elo_tournaments_needing_review.csv
@@ -221,3 +226,15 @@ See `docs/decision-log.md` for accepted architecture, unresolved methodological 
 This repository should own **source history, classification, and Elo construction**. The elite-pathways repository should continue to own the separate research question of how tournament strength is measured and which achievements count toward a pathway endpoint.
 
 A future integration should therefore pass stable artifacts such as classified tournaments, selected matches, and athlete Elo history into elite pathways. It should not copy VIS request code or maintain a second tournament taxonomy there.
+
+
+## Player identity key
+
+`data-processed/vis_players.parquet` is the canonical athlete identity table. It is keyed by the VIS player number as character `athlete_id` and retains:
+
+- display, first, last, popular, and team names;
+- federation and nationality;
+- player gender;
+- beach participation/activity flags.
+
+`scripts/05b-enrich-elo-players.R` joins those fields onto the existing Elo history/current artifacts without recalculating Elo. It also writes `player_key_coverage.csv` so missing-name coverage is explicit.
