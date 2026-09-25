@@ -8,15 +8,24 @@ source_project_functions()
 
 tournaments <- read_parquet(
   "data-processed/beach_tournaments_classified.parquet"
-) |>
+)
+
+if (!"start_date_qualification" %in% names(tournaments)) {
+  tournaments$start_date_qualification <- NA_character_
+}
+if (!"start_date_main_draw" %in% names(tournaments)) {
+  tournaments$start_date_main_draw <- NA_character_
+}
+
+tournaments <- tournaments |>
   dplyr::filter(!is.na(no), no > 0) |>
-  dplyr::arrange(
-    dplyr::coalesce(
+  dplyr::mutate(
+    archive_start_date = dplyr::coalesce(
       as.Date(start_date_qualification),
       as.Date(start_date_main_draw)
-    ),
-    no
-  )
+    )
+  ) |>
+  dplyr::arrange(archive_start_date, no)
 
 cache_dir <- "data-raw/matches/by-tournament"
 pause <- request_pause_seconds()
@@ -79,7 +88,20 @@ cache_files <- list.files(
   full.names = TRUE
 )
 
-matches <- purrr::map_dfr(cache_files, readRDS) |>
+if (length(cache_files) == 0L) {
+  stop(
+    "No tournament match caches were created. Check data-processed/match_pull_manifest.csv.",
+    call. = FALSE
+  )
+}
+
+matches <- purrr::map_dfr(cache_files, readRDS)
+
+if (!"no" %in% names(matches)) {
+  stop("Cached VIS match data do not contain the canonical match field 'No'.", call. = FALSE)
+}
+
+matches <- matches |>
   dplyr::distinct(no, .keep_all = TRUE)
 
 write_parquet(matches, "data-processed/beach_matches.parquet")
