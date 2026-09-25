@@ -737,6 +737,271 @@ print(shared_row_summary, n = Inf)
 message("\nMatch overlap by year/gender:")
 print(match_overlap_by_year, n = Inf)
 
+# -------------------------------------------------------------------------
+# Why are legacy matches excluded from the rebuilt Elo universe?
+# -------------------------------------------------------------------------
+
+config <- read_elo_config()
+tournament_audit <- build_elo_tournament_audit(
+  classified_tournaments,
+  config
+)
+
+include_match_nos <- as.character(unlist(config$selection$include_match_nos))
+exclude_match_nos <- as.character(unlist(config$selection$exclude_match_nos))
+exclude_tournament_nos <- as.integer(
+  unlist(config$selection$exclude_tournament_nos)
+)
+include_result_types <- as.integer(
+  unlist(config$selection$include_result_types)
+)
+
+legacy_only_raw <- legacy_overlap |>
+  dplyr::filter(
+    common_period,
+    in_raw_archive,
+    !in_new_elo
+  ) |>
+  dplyr::left_join(
+    raw_matches |>
+      dplyr::transmute(
+        raw_match_no = as.character(no),
+        no_tournament = as.integer(no_tournament),
+        local_date = as.Date(local_date),
+        result_type_code = suppressWarnings(as.integer(result_type)),
+        match_points_a = suppressWarnings(as.numeric(match_points_a)),
+        match_points_b = suppressWarnings(as.numeric(match_points_b)),
+        no_team_a = suppressWarnings(as.numeric(no_team_a)),
+        no_team_b = suppressWarnings(as.numeric(no_team_b)),
+        deleted_dt = as.character(deleted_dt),
+        round_name = as.character(round_name),
+        round_code = as.character(round_code)
+      ),
+    by = "raw_match_no"
+  ) |>
+  dplyr::left_join(
+    tournament_audit |>
+      dplyr::transmute(
+        no_tournament = as.integer(tournament_no),
+        event_class,
+        tournament_name_current = tournament_name,
+        elo_tournament_status,
+        elo_tournament_reason
+      ),
+    by = "no_tournament"
+  ) |>
+  dplyr::mutate(
+    is_qualification = stringr::str_detect(
+      stringr::str_to_lower(
+        paste(
+          dplyr::coalesce(round_name, ""),
+          dplyr::coalesce(round_code, "")
+        )
+      ),
+      "qual"
+    ),
+    exclusion_reason = dplyr::case_when(
+      raw_match_no %in% exclude_match_nos ~
+        "manual match exclusion",
+      no_tournament %in% exclude_tournament_nos ~
+        "manual tournament exclusion",
+      !(elo_tournament_status == "include") &
+        !(raw_match_no %in% include_match_nos) ~
+        paste0(
+          "tournament not selected: ",
+          dplyr::coalesce(elo_tournament_reason, "unknown")
+        ),
+      length(include_result_types) > 0L &
+        !result_type_code %in% include_result_types ~
+        paste0(
+          "result type excluded: ",
+          dplyr::coalesce(as.character(result_type_code), "NA")
+        ),
+      is.na(match_points_a) | is.na(match_points_b) |
+        match_points_a == match_points_b ~
+        "non-decisive or missing match points",
+      is.na(no_team_a) | is.na(no_team_b) |
+        no_team_a <= 0 | no_team_b <= 0 ~
+        "invalid team IDs",
+      !is.na(deleted_dt) & deleted_dt != "" ~
+        "deleted VIS match",
+      !isTRUE(config$selection$include_qualification) &
+        is_qualification ~
+        "qualification excluded",
+      TRUE ~
+        "other selector difference"
+    )
+  )
+
+readr::write_csv(
+  legacy_only_raw,
+  "data-processed/legacy_matches_excluded_from_new_elo.csv"
+)
+
+legacy_exclusion_summary <- legacy_only_raw |>
+  dplyr::count(exclusion_reason, sort = TRUE, name = "matches")
+
+readr::write_csv(
+  legacy_exclusion_summary,
+  "data-processed/legacy_match_exclusion_reasons.csv"
+)
+
+legacy_missing_raw <- legacy_overlap |>
+  dplyr::filter(
+    common_period,
+    !in_raw_archive
+  ) |>
+  dplyr::mutate(
+    year = as.integer(format(match_date, "%Y"))
+  ) |>
+  dplyr::arrange(match_date, gender, legacy_tournament)
+
+readr::write_csv(
+  legacy_missing_raw,
+  "data-processed/legacy_matches_missing_from_raw_archive.csv"
+)
+
+legacy_missing_raw_summary <- legacy_missing_raw |>
+  dplyr::count(
+    gender,
+    year,
+    legacy_tournament,
+    sort = TRUE,
+    name = "matches"
+  )
+
+readr::write_csv(
+  legacy_missing_raw_summary,
+  "data-processed/legacy_missing_raw_summary.csv"
+)
+
+message("\nWhy legacy 2008+ matches are excluded from the new Elo universe:")
+print(legacy_exclusion_summary, n = Inf)
+
+message("\nLargest legacy 2008+ raw-archive gaps:")
+print(
+  legacy_missing_raw_summary |>
+    dplyr::slice_head(n = 25L),
+  n = 25,
+  width = Inf
+)
+
+# -------------------------------------------------------------------------
+# Legacy Elo formula parity.
+#
+# This test is path-independent: use the legacy pre-match ratings themselves,
+# reconstruct opponent strength and the K=30 update, then compare the
+# reconstructed post-match rating with the stored legacy post-match rating.
+# -------------------------------------------------------------------------
+
+if (!"partner" %in% names(legacy)) {
+  stop(
+    "Legacy formula parity requires the legacy 'partner' column.",
+    call. = FALSE
+  )
+}
+
+legacy_formula_base <- legacy |>
+  dplyr::filter(!is.na(match_id), !is.na(athlete), !is.na(partner)) |>
+  dplyr::transmute(
+    legacy_match_id = as.character(match_id),
+    athlete_id = as.character(athlete),
+    partner_id = as.character(partner),
+    actual_score = suppressWarnings(as.numeric(result)),
+    elo_before = as.numeric(athlete_elo_before),
+    elo_after = as.numeric(athlete_elo_after),
+    k_factor = if ("k_factor" %in% names(legacy)) {
+      as.numeric(k_factor)
+    } else {
+      30
+    }
+  )
+
+legacy_opponent_rows <- legacy_formula_base |>
+  dplyr::select(
+    legacy_match_id,
+    opponent_id = athlete_id,
+    opponent_elo_before = elo_before
+  )
+
+legacy_formula_check <- legacy_formula_base |>
+  dplyr::inner_join(
+    legacy_opponent_rows,
+    by = "legacy_match_id",
+    relationship = "many-to-many"
+  ) |>
+  dplyr::filter(
+    opponent_id != athlete_id,
+    opponent_id != partner_id
+  ) |>
+  dplyr::group_by(
+    legacy_match_id,
+    athlete_id,
+    partner_id,
+    actual_score,
+    elo_before,
+    elo_after,
+    k_factor
+  ) |>
+  dplyr::summarise(
+    opponent_count = dplyr::n_distinct(opponent_id),
+    opponent_team_mean_elo = mean(opponent_elo_before),
+    .groups = "drop"
+  ) |>
+  dplyr::filter(
+    opponent_count == 2L,
+    actual_score %in% c(0, 1),
+    !is.na(elo_before),
+    !is.na(elo_after)
+  ) |>
+  dplyr::mutate(
+    reconstructed_expected = 1 / (
+      1 + 10 ^ ((opponent_team_mean_elo - elo_before) / 400)
+    ),
+    reconstructed_change =
+      k_factor * (actual_score - reconstructed_expected),
+    reconstructed_after = elo_before + reconstructed_change,
+    formula_error = elo_after - reconstructed_after,
+    abs_formula_error = abs(formula_error)
+  )
+
+readr::write_csv(
+  legacy_formula_check,
+  "data-processed/legacy_elo_formula_parity.csv"
+)
+
+legacy_formula_summary <- tibble::tibble(
+  metric = c(
+    "eligible_athlete_match_rows",
+    "mean_abs_formula_error",
+    "median_abs_formula_error",
+    "max_abs_formula_error",
+    "share_within_1e_8",
+    "share_within_1e_6",
+    "share_within_1e_4"
+  ),
+  value = c(
+    nrow(legacy_formula_check),
+    mean(legacy_formula_check$abs_formula_error, na.rm = TRUE),
+    stats::median(
+      legacy_formula_check$abs_formula_error,
+      na.rm = TRUE
+    ),
+    max(legacy_formula_check$abs_formula_error, na.rm = TRUE),
+    mean(legacy_formula_check$abs_formula_error <= 1e-8),
+    mean(legacy_formula_check$abs_formula_error <= 1e-6),
+    mean(legacy_formula_check$abs_formula_error <= 1e-4)
+  )
+)
+
+readr::write_csv(
+  legacy_formula_summary,
+  "data-processed/legacy_elo_formula_parity_summary.csv"
+)
+
+message("\nLegacy K=30 Elo formula parity:")
+print(legacy_formula_summary, n = Inf)
+
 if ("tourn_cat" %in% names(legacy)) {
   message("\nLegacy tournament categories:")
   legacy |>
