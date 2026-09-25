@@ -55,6 +55,26 @@ This repository owns VIS extraction, competition classification, Elo match selec
 
 `beach-elite-pathways` continues to own tournament-strength research, endpoint definitions, and pathway modeling. It should eventually consume frozen outputs from this repository rather than reproduce VIS logic.
 
+
+### 2026-09-25 — Elo history begins on 2008-01-01
+
+The raw VIS tournament archive remains intact, but Elo construction excludes all tournaments and matches before 2008-01-01.
+
+Reason: pre-2008 VIS coverage is not considered reliable enough for a canonical Elo history.
+
+### 2026-09-25 — Selected senior continental pathways are included in Elo
+
+The Elo profile includes senior continental competition classes when the VIS organizer code is one of:
+
+- AVC;
+- NORCECA;
+- CSV;
+- CEV.
+
+CAVB is explicitly excluded from this profile. Youth continental classes and zonal tours remain excluded.
+
+Continental candidates with an unrecognized organizer code are marked for review rather than silently included or excluded. The same tournament selector drives both the review CSV and match-level Elo eligibility.
+
 ## Open decisions before production use
 
 ### Exact production Elo universe
