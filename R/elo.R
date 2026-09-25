@@ -12,6 +12,126 @@ add_missing_columns <- function(data, defaults) {
   data
 }
 
+
+build_elo_tournament_audit <- function(tournaments, config) {
+  required <- c("no", "gender", "event_class")
+  missing <- setdiff(required, names(tournaments))
+  if (length(missing) > 0L) {
+    stop(
+      "Tournament data missing required fields: ",
+      paste(missing, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  tournaments <- add_missing_columns(
+    tournaments,
+    list(
+      season = NA_character_,
+      name = NA_character_,
+      title = NA_character_,
+      vis_type_raw = NA_character_,
+      vis_type_name = NA_character_,
+      classification_source = NA_character_,
+      classification_notes = NA_character_,
+      country_code = NA_character_,
+      start_date_qualification = NA_character_,
+      end_date_qualification = NA_character_,
+      start_date_main_draw = NA_character_,
+      end_date_main_draw = NA_character_
+    )
+  )
+
+  include_classes <- as.character(unlist(config$selection$include_event_classes))
+  include_nos <- as.integer(unlist(config$selection$include_tournament_nos))
+  exclude_nos <- as.integer(unlist(config$selection$exclude_tournament_nos))
+  allowed_genders <- as.character(unlist(config$selection$genders))
+
+  start_limit <- as_date_or_null(config$selection$start_date)
+  end_limit <- as_date_or_null(config$selection$end_date)
+
+  out <- tournaments |>
+    dplyr::mutate(
+      tournament_no = as.integer(no),
+      tournament_name = dplyr::coalesce(
+        as.character(title),
+        as.character(name)
+      ),
+      start_date = dplyr::coalesce(
+        as.Date(start_date_qualification),
+        as.Date(start_date_main_draw)
+      ),
+      end_date = dplyr::coalesce(
+        as.Date(end_date_main_draw),
+        as.Date(end_date_qualification)
+      ),
+      event_year = suppressWarnings(as.integer(format(start_date, "%Y"))),
+      gender_allowed = gender %in% allowed_genders,
+      class_selected = !is.na(event_class) & event_class %in% include_classes,
+      manual_include = tournament_no %in% include_nos,
+      manual_exclude = tournament_no %in% exclude_nos,
+      unresolved_classification =
+        is.na(event_class) |
+        event_class == "Other" |
+        classification_source == "unclassified",
+      within_start_date = if (is.null(start_limit)) {
+        TRUE
+      } else {
+        !is.na(start_date) & start_date >= start_limit
+      },
+      within_end_date = if (is.null(end_limit)) {
+        TRUE
+      } else {
+        !is.na(start_date) & start_date <= end_limit
+      },
+      within_date_window = within_start_date & within_end_date,
+      elo_selection_status = dplyr::case_when(
+        manual_exclude ~ "exclude",
+        !gender_allowed ~ "exclude",
+        !within_date_window ~ "exclude",
+        manual_include ~ "include",
+        class_selected ~ "include",
+        unresolved_classification ~ "review",
+        TRUE ~ "exclude"
+      ),
+      elo_selection_reason = dplyr::case_when(
+        manual_exclude ~ "manual tournament exclusion",
+        !gender_allowed ~ "gender not selected by Elo profile",
+        !within_date_window ~ "outside Elo profile date window",
+        manual_include ~ "manual tournament inclusion",
+        class_selected ~ paste0("selected event class: ", event_class),
+        unresolved_classification ~ "unresolved tournament classification",
+        TRUE ~ paste0("event class not selected: ", dplyr::coalesce(event_class, "NA"))
+      ),
+      elo_profile = config$profile_name
+    ) |>
+    dplyr::select(
+      elo_profile,
+      elo_selection_status,
+      elo_selection_reason,
+      tournament_no,
+      event_year,
+      start_date,
+      end_date,
+      season,
+      gender,
+      event_class,
+      vis_type_raw,
+      vis_type_name,
+      classification_source,
+      classification_notes,
+      country_code,
+      name,
+      title,
+      tournament_name,
+      dplyr::everything(),
+      -no
+    ) |>
+    dplyr::arrange(start_date, gender, tournament_no)
+
+  out
+}
+
 prepare_elo_matches <- function(matches, tournaments, config) {
   required_match <- c(
     "no", "no_tournament", "local_date",
