@@ -102,10 +102,6 @@ if (length(cache_files) == 0L) {
 cache_rows <- purrr::map(cache_files, function(path) {
   x <- readRDS(path)
 
-  if (nrow(x) == 0L) {
-    return(x)
-  }
-
   dplyr::mutate(
     x,
     dplyr::across(dplyr::everything(), as.character)
