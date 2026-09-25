@@ -1,0 +1,46 @@
+profile_name: senior_fivb_broad_v1
+
+selection:
+  genders:
+    - M
+    - W
+
+  # Empty/null dates mean use the full available archive.
+  start_date: null
+  end_date: null
+
+  # Qualification matches are part of the tournament competition history and
+  # are included by default. This can be changed for a frozen downstream profile.
+  include_qualification: true
+
+  # Initial broad senior international universe. Narrow research-specific
+  # profiles should be frozen explicitly rather than changing raw history.
+  include_event_classes:
+    - Olympic Games
+    - World Championship
+    - World Tour Finals
+    - Pro Tour Finals
+    - Elite16
+    - Challenge
+    - Grand Slam
+    - Major Series
+    - 5-Star
+    - 4-Star
+    - 3-Star
+    - 2-Star
+    - 1-Star
+    - Open
+    - Challenger
+    - World Series
+
+  # VIS tournament No values. Manual include wins over class selection;
+  # manual exclude is applied last.
+  include_tournament_nos: []
+  exclude_tournament_nos: []
+
+elo:
+  initial_rating: 1500
+  k_factor: 30
+  scale: 400
+  opponent_strength: mean
+  update_unit: athlete
