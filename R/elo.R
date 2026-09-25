@@ -104,21 +104,30 @@ prepare_elo_matches <- function(matches, tournaments, config) {
   include_classes <- unlist(config$selection$include_event_classes)
   include_nos <- as.integer(unlist(config$selection$include_tournament_nos))
   exclude_nos <- as.integer(unlist(config$selection$exclude_tournament_nos))
+  include_match_nos <- as.integer(unlist(config$selection$include_match_nos))
+  exclude_match_nos <- as.integer(unlist(config$selection$exclude_match_nos))
 
-  if (length(include_classes) > 0L) {
+  has_explicit_selection <- length(include_classes) > 0L ||
+    length(include_nos) > 0L ||
+    length(include_match_nos) > 0L
+
+  if (has_explicit_selection) {
     out <- out |>
       dplyr::filter(
         event_class %in% include_classes |
-          no_tournament %in% include_nos
+          no_tournament %in% include_nos |
+          no %in% include_match_nos
       )
-  } else if (length(include_nos) > 0L) {
-    out <- out |>
-      dplyr::filter(no_tournament %in% include_nos)
   }
 
   if (length(exclude_nos) > 0L) {
     out <- out |>
       dplyr::filter(!no_tournament %in% exclude_nos)
+  }
+
+  if (length(exclude_match_nos) > 0L) {
+    out <- out |>
+      dplyr::filter(!no %in% exclude_match_nos)
   }
 
   if (!isTRUE(config$selection$include_qualification)) {
