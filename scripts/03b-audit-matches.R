@@ -154,15 +154,34 @@ review_matches <- matches_audit |>
 
 selected_result_types <- selected_matches |>
   dplyr::mutate(
-    result_type = dplyr::coalesce(as.character(result_type), "NA"),
+    result_type_code = suppressWarnings(as.integer(result_type)),
+    result_type_label = decode_beach_match_result_type(result_type),
     status = dplyr::coalesce(as.character(status), "NA")
   ) |>
   dplyr::count(
-    result_type,
+    result_type_code,
+    result_type_label,
     status,
     decisive_match_points,
     missing_player_id,
     sort = TRUE
+  )
+
+selected_valid_result_types <- selected_matches |>
+  dplyr::filter(
+    !missing_player_id,
+    !missing_team_id,
+    decisive_match_points
+  ) |>
+  dplyr::mutate(
+    result_type_code = suppressWarnings(as.integer(result_type)),
+    result_type_label = decode_beach_match_result_type(result_type)
+  ) |>
+  dplyr::count(
+    result_type_code,
+    result_type_label,
+    sort = TRUE,
+    name = "matches"
   )
 
 readr::write_csv(
@@ -185,6 +204,13 @@ readr::write_csv(
   "data-processed/elo_selected_result_types.csv",
   na = ""
 )
+readr::write_csv(
+  selected_valid_result_types,
+  "data-processed/elo_selected_valid_result_types.csv",
+  na = ""
+)
 
 message("Match archive audit complete.")
 print(overview, n = Inf)
+message("\nValid decisive selected matches by VIS result type:")
+print(selected_valid_result_types, n = Inf)
