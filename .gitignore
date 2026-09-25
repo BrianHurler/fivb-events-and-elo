@@ -1,0 +1,12 @@
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+.Renviron
+.env
+.DS_Store
+
+data-raw/**
+!data-raw/.gitkeep
+data-processed/**
+!data-processed/.gitkeep
