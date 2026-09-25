@@ -140,7 +140,7 @@ vis_get_beach_players <- function(api_url = VIS_API_URL) {
     "FirstName",
     "LastName",
     "Gender",
-    "Nationality",
+    "NationalityCode",
     "TeamName",
     "PopularName",
     "PlaysBeach",
@@ -154,6 +154,16 @@ vis_get_beach_players <- function(api_url = VIS_API_URL) {
     node_name = "Player",
     api_url = api_url
   )
+
+  expected_player_columns <- c(
+    "no", "federation_code", "first_name", "last_name", "gender",
+    "nationality_code", "team_name", "popular_name",
+    "plays_beach", "active_beach"
+  )
+
+  for (nm in setdiff(expected_player_columns, names(players))) {
+    players[[nm]] <- NA_character_
+  }
 
   players |>
     dplyr::mutate(
@@ -172,7 +182,7 @@ vis_get_beach_players <- function(api_url = VIS_API_URL) {
       ),
       player_gender = normalize_event_gender(gender),
       player_federation = as.character(federation_code),
-      player_nationality = as.character(nationality)
+      player_nationality = as.character(nationality_code)
     ) |>
     dplyr::select(
       athlete_id,
@@ -190,7 +200,7 @@ vis_get_beach_players <- function(api_url = VIS_API_URL) {
       -no,
       -gender,
       -federation_code,
-      -nationality,
+      -nationality_code,
       -full_name
     ) |>
     dplyr::distinct(athlete_id, .keep_all = TRUE)
