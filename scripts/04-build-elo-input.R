@@ -16,7 +16,7 @@ elo_matches <- prepare_elo_matches(matches, tournaments, config)
 write_parquet(elo_matches, "data-processed/elo_matches.parquet")
 
 summary <- elo_matches |>
-  dplyr::count(gender, event_class, name = "matches") |>
+  dplyr::count(gender, event_class, result_type_label, name = "matches") |>
   dplyr::arrange(gender, dplyr::desc(matches))
 
 readr::write_csv(summary, "data-processed/elo_match_selection_summary.csv")
