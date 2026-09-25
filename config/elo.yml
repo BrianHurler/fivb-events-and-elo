@@ -38,6 +38,11 @@ selection:
   include_tournament_nos: []
   exclude_tournament_nos: []
 
+  # VIS BeachMatch No values. Explicit match includes join the selected universe;
+  # explicit match excludes are applied last.
+  include_match_nos: []
+  exclude_match_nos: []
+
 elo:
   initial_rating: 1500
   k_factor: 30
