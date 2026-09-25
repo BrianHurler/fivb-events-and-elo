@@ -96,6 +96,10 @@ These overrides include several events whose VIS organizer metadata are blank or
 
 Tournament No 505 (`Congress 2010`) is excluded after review because it is not a beach-volleyball competition despite appearing in the VIS tournament archive.
 
+### 2026-09-25 — Missing match times sort at midnight
+
+When VIS lacks `LocalTime`, Elo ordering treats the match time as `00:00:00`. The same ordering rule is used for rating calculation, athlete career-match numbering, current-rating extraction, and validation so those stages cannot disagree about an athlete's first or last match.
+
 ### 2026-09-25 — Elo matches require four distinct player IDs
 
 VIS records with missing/non-positive player IDs or duplicate player IDs within the same match are excluded from Elo construction. The calculator retains a hard stop as a final guardrail if any malformed match bypasses preprocessing.
