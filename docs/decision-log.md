@@ -75,6 +75,23 @@ CAVB is explicitly excluded from this profile. Youth continental classes and zon
 
 Continental candidates with an unrecognized organizer code are marked for review rather than silently included or excluded. The same tournament selector drives both the review CSV and match-level Elo eligibility.
 
+
+### 2026-09-25 — Youth title markers are a hard Elo exclusion
+
+Tournament classification alone is not sufficient to distinguish every senior and age-group continental event. The Elo selector therefore excludes tournaments whose event class or name/title identifies U15 through U23 competition, including common U23 / U-23 / Under-23 variants.
+
+This exclusion is evaluated before class-based and manual tournament inclusion so that a youth event cannot enter Elo merely because VIS labels it as a generic `Continental Tour`.
+
+### 2026-09-25 — Futures are included
+
+Beach Pro Tour Futures are part of the Elo competition universe from 2008 onward. Cancelled Futures can remain in the proposed tournament list; without completed VIS matches they have no effect on Elo.
+
+### 2026-09-25 — Reviewed special tournaments are explicit includes
+
+Tournament Nos 1008, 1009, 2060, 2061, 2069, 3305, 3306, 5417, 5419, 6269, 6270, 6271, 7003, and 7496 are explicit inclusions based on manual review.
+
+These overrides include several events whose VIS organizer metadata are blank or non-confederation codes. Because 6269 and 6270 are African Commonwealth Games qualifiers, they are explicit exceptions to the general CAVB/Africa exclusion rather than evidence for broad African continental inclusion.
+
 ## Open decisions before production use
 
 ### Exact production Elo universe
