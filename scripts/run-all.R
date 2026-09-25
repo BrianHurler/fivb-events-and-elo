@@ -4,6 +4,7 @@ stages <- c(
   "scripts/00-setup.R",
   "scripts/01-pull-events.R",
   "scripts/02-classify-tournaments.R",
+  "scripts/02b-build-elo-tournament-universe.R",
   "scripts/03-pull-matches.R",
   "scripts/04-build-elo-input.R",
   "scripts/05-calculate-elo.R",
