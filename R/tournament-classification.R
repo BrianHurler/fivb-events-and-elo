@@ -1,3 +1,14 @@
+normalize_event_gender <- function(x) {
+  raw <- as.character(x)
+  dplyr::case_when(
+    raw %in% c("0", "M", "Men", "men") ~ "M",
+    raw %in% c("1", "W", "Women", "women") ~ "W",
+    raw %in% c("2", "MW", "MenWomen", "Men and women") ~ "MW",
+    raw %in% c("3", "Mixed", "mixed") ~ "Mixed",
+    TRUE ~ raw
+  )
+}
+
 infer_event_class_from_text <- function(name, title = name) {
   x <- stringr::str_to_lower(paste(name, title))
 
@@ -55,6 +66,8 @@ classify_beach_tournaments <- function(tournaments, type_map) {
 
   tournaments |>
     dplyr::mutate(
+      gender_raw = as.character(gender),
+      gender = normalize_event_gender(gender),
       vis_type_raw = raw_type,
       vis_type_value = numeric_type,
       vis_type_name = mapped_type_name,
