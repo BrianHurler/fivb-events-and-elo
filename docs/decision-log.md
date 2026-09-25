@@ -96,6 +96,14 @@ These overrides include several events whose VIS organizer metadata are blank or
 
 Tournament No 505 (`Congress 2010`) is excluded after review because it is not a beach-volleyball competition despite appearing in the VIS tournament archive.
 
+### 2026-09-25 — Only normal completed matches move Elo
+
+The current Elo profile includes only VIS beach match `ResultType = 0` (Normal).
+
+Forfeits, injury results, out results, and disqualifications remain in the canonical raw match archive but do not update athlete Elo. This keeps the rating focused on played performance rather than administrative outcomes or availability.
+
+The audited selected universe contained 85,988 normal decisive matches with valid player/team IDs before the final deleted/date checks in Stage 04.
+
 ## Open decisions before production use
 
 ### Exact production Elo universe
@@ -107,12 +115,6 @@ We still need to determine the exact historical inclusion rule required for a pr
 ### Qualification matches
 
 Qualification is included in the broad profile. We need to confirm whether this matches the legacy Elo pipeline and whether any downstream profile should differ.
-
-### Forfeits, retirements, defaults, and unusual result types
-
-The first implementation requires a decisive match-point result but does not yet freeze a policy for every VIS `ResultType`.
-
-Before production use, enumerate result types in the archive, compare them with the legacy Elo source, and make the treatment explicit in configuration or preprocessing.
 
 ### Historical coverage gaps
 
