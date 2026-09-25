@@ -12,6 +12,28 @@ add_missing_columns <- function(data, defaults) {
   data
 }
 
+decode_beach_match_result_type <- function(x) {
+  x <- suppressWarnings(as.integer(x))
+
+  dplyr::case_when(
+    x == 0L ~ "Normal",
+    x == 1L ~ "ForfeitA",
+    x == 2L ~ "ForfeitB",
+    x == 3L ~ "ForfeitBoth",
+    x == 4L ~ "InjuryA",
+    x == 5L ~ "InjuryB",
+    x == 6L ~ "InjuryBoth",
+    x == 7L ~ "OutA",
+    x == 8L ~ "OutB",
+    x == 9L ~ "OutBoth",
+    x == 10L ~ "DisqualifiedA",
+    x == 11L ~ "DisqualifiedB",
+    x == 12L ~ "DisqualifiedBoth",
+    is.na(x) ~ "Missing",
+    TRUE ~ paste0("Unknown_", x)
+  )
+}
+
 
 build_elo_tournament_audit <- function(tournaments, config) {
   required <- c("no", "gender", "event_class")
