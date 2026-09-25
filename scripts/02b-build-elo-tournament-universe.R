@@ -18,6 +18,9 @@ selected <- audit |>
 review <- audit |>
   dplyr::filter(elo_selection_status == "review")
 
+continental <- audit |>
+  dplyr::filter(continental_candidate)
+
 readr::write_csv(
   selected,
   "data-processed/elo_tournaments_proposed.csv",
@@ -33,6 +36,12 @@ readr::write_csv(
 readr::write_csv(
   review,
   "data-processed/elo_tournaments_needing_review.csv",
+  na = ""
+)
+
+readr::write_csv(
+  continental,
+  "data-processed/elo_continental_tournament_audit.csv",
   na = ""
 )
 
@@ -55,5 +64,6 @@ message(
   config$profile_name,
   "': ",
   nrow(selected), " proposed includes; ",
-  nrow(review), " unresolved tournaments require review."
+  nrow(review), " tournaments require review; ",
+  sum(continental$elo_selection_status == "include"), " continental includes."
 )
