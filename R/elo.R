@@ -255,7 +255,12 @@ prepare_elo_matches <- function(matches, tournaments, config) {
       round_code = NA_character_,
       local_time = NA_character_,
       team_a_federation_code = NA_character_,
-      team_b_federation_code = NA_character_
+      team_b_federation_code = NA_character_,
+      no_in_tournament = NA_integer_,
+      round_phase = NA_character_,
+      points_team_a_set1 = NA_integer_, points_team_b_set1 = NA_integer_,
+      points_team_a_set2 = NA_integer_, points_team_b_set2 = NA_integer_,
+      points_team_a_set3 = NA_integer_, points_team_b_set3 = NA_integer_
     )
   )
 
@@ -383,6 +388,37 @@ prepare_elo_matches <- function(matches, tournaments, config) {
     dplyr::distinct(no, .keep_all = TRUE)
 }
 
+# VIS stores an unplayed set as 0-0 (or blank). Return the played sets
+# points for Team A and Team B, with unplayed sets as NA, plus a flag for
+# whether the set points agree with the VIS sets-won result.
+summarise_match_score <- function(row) {
+  get_points <- function(nm) {
+    if (!nm %in% names(row)) return(NA_integer_)
+    suppressWarnings(as.integer(row[[nm]][[1]]))
+  }
+  a <- vapply(1:3, function(s) get_points(paste0("points_team_a_set", s)), integer(1))
+  b <- vapply(1:3, function(s) get_points(paste0("points_team_b_set", s)), integer(1))
+  unplayed <- dplyr::coalesce(a, 0L) == 0L & dplyr::coalesce(b, 0L) == 0L
+  a[unplayed] <- NA_integer_
+  b[unplayed] <- NA_integer_
+
+  sets_a <- suppressWarnings(as.integer(row$match_points_a[[1]]))
+  sets_b <- suppressWarnings(as.integer(row$match_points_b[[1]]))
+  played <- !is.na(a) & !is.na(b)
+  complete <- any(played) &&
+    !anyNA(c(sets_a, sets_b)) &&
+    sum(played) == sets_a + sets_b &&
+    sum(a[played] > b[played]) == sets_a &&
+    sum(b[played] > a[played]) == sets_b
+
+  list(
+    a = a, b = b, sets_a = sets_a, sets_b = sets_b,
+    points_a = if (any(played)) sum(a[played]) else NA_integer_,
+    points_b = if (any(played)) sum(b[played]) else NA_integer_,
+    complete = complete
+  )
+}
+
 elo_expected <- function(rating, opponent_rating, scale = 400) {
   1 / (1 + 10 ^ ((opponent_rating - rating) / scale))
 }
@@ -467,6 +503,8 @@ calculate_athlete_elo <- function(matches, initial_rating = 1500,
       NA_character_
     }
 
+    score <- summarise_match_score(row)
+
     result[[i]] <- tibble::tibble(
       match_no = rep(row$no[[1]], 4),
       tournament_no = rep(row$no_tournament[[1]], 4),
@@ -497,7 +535,26 @@ calculate_athlete_elo <- function(matches, initial_rating = 1500,
       athlete_elo_before = unname(pre),
       athlete_elo_change = unname(delta),
       athlete_elo_after = unname(post),
-      k_factor = rep(k_factor, 4)
+      k_factor = rep(k_factor, 4),
+      no_in_tournament = rep(suppressWarnings(as.integer(row$no_in_tournament[[1]])), 4),
+      round_code = rep(as.character(row$round_code[[1]]), 4),
+      round_name = rep(as.character(row$round_name[[1]]), 4),
+      round_phase = rep(as.character(row$round_phase[[1]]), 4),
+      result_type = rep(
+        if ("result_type_code" %in% names(row)) row$result_type_code[[1]] else NA_integer_,
+        4
+      ),
+      sets_for = c(score$sets_a, score$sets_a, score$sets_b, score$sets_b),
+      sets_against = c(score$sets_b, score$sets_b, score$sets_a, score$sets_a),
+      set1_for = c(score$a[1], score$a[1], score$b[1], score$b[1]),
+      set1_against = c(score$b[1], score$b[1], score$a[1], score$a[1]),
+      set2_for = c(score$a[2], score$a[2], score$b[2], score$b[2]),
+      set2_against = c(score$b[2], score$b[2], score$a[2], score$a[2]),
+      set3_for = c(score$a[3], score$a[3], score$b[3], score$b[3]),
+      set3_against = c(score$b[3], score$b[3], score$a[3], score$a[3]),
+      points_for = c(score$points_a, score$points_a, score$points_b, score$points_b),
+      points_against = c(score$points_b, score$points_b, score$points_a, score$points_a),
+      score_complete = rep(score$complete, 4)
     )
   }
 

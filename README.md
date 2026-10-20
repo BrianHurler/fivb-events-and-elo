@@ -204,7 +204,10 @@ data-processed/elo_matches.parquet
 data-processed/athlete_elo_history.parquet
 data-processed/athlete_elo_current.parquet
 data-processed/pipeline_validation.csv
+data-processed/score_coverage.csv
 ```
+
+Each `athlete_elo_history` row also carries that match's score from the athlete's side: `sets_for`/`sets_against`, `set1_for`–`set3_against`, `points_for`/`points_against`, and `score_complete`, plus `no_in_tournament`, `round_code`, `round_name`, `round_phase`, and `result_type`. Join back to `beach_matches.parquet` on `match_no` = `no` for any other VIS field.
 
 ## Recommended next validation
 

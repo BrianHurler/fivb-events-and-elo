@@ -62,3 +62,19 @@ if (any(!checks$passed)) {
 }
 
 message("All pipeline validation checks passed.")
+
+# Score coverage is reported, not enforced: older VIS events can lack set
+# points. score_complete means the set points agree with the VIS sets won.
+score_coverage <- history |>
+  dplyr::distinct(match_no, gender, date, score_complete) |>
+  dplyr::mutate(year = as.integer(format(date, "%Y"))) |>
+  dplyr::summarise(
+    matches = dplyr::n(),
+    complete_scores = sum(score_complete, na.rm = TRUE),
+    share_complete = complete_scores / matches,
+    .by = c(gender, year)
+  ) |>
+  dplyr::arrange(gender, year)
+
+readr::write_csv(score_coverage, "data-processed/score_coverage.csv")
+print(score_coverage, n = Inf)

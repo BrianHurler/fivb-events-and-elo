@@ -112,6 +112,14 @@ Forfeits, injury results, out results, and disqualifications remain in the canon
 
 The audited selected universe contained 85,988 normal decisive matches with valid player/team IDs before the final deleted/date checks in Stage 04.
 
+### 2026-10-20 — Elo history carries match scores and round context
+
+`athlete_elo_history.parquet` keeps the VIS set points, sets won, total rally points, round fields, `no_in_tournament`, and `result_type`, each seen from the athlete's own side (`*_for` / `*_against`).
+
+Reason: downstream studies (BCS KOTB tiebreaks) need scorelines paired with each match's pre-match Elo, and the history should be the reusable record of everything VIS returns for a match. Unplayed sets (0-0 or blank in VIS) are stored as NA. `score_complete` is TRUE only when the set points agree with the VIS sets won.
+
+Elo calculation is unchanged; the new columns are added after the existing ones.
+
 ## Open decisions before production use
 
 ### Exact production Elo universe
