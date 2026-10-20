@@ -258,9 +258,9 @@ prepare_elo_matches <- function(matches, tournaments, config) {
       team_b_federation_code = NA_character_,
       no_in_tournament = NA_integer_,
       round_phase = NA_character_,
-      points_team_a_set1 = NA_integer_, points_team_b_set1 = NA_integer_,
-      points_team_a_set2 = NA_integer_, points_team_b_set2 = NA_integer_,
-      points_team_a_set3 = NA_integer_, points_team_b_set3 = NA_integer_
+      points_team_aset1 = NA_integer_, points_team_bset1 = NA_integer_,
+      points_team_aset2 = NA_integer_, points_team_bset2 = NA_integer_,
+      points_team_aset3 = NA_integer_, points_team_bset3 = NA_integer_
     )
   )
 
@@ -396,8 +396,8 @@ summarise_match_score <- function(row) {
     if (!nm %in% names(row)) return(NA_integer_)
     suppressWarnings(as.integer(row[[nm]][[1]]))
   }
-  a <- vapply(1:3, function(s) get_points(paste0("points_team_a_set", s)), integer(1))
-  b <- vapply(1:3, function(s) get_points(paste0("points_team_b_set", s)), integer(1))
+  a <- vapply(1:3, function(s) get_points(paste0("points_team_aset", s)), integer(1))
+  b <- vapply(1:3, function(s) get_points(paste0("points_team_bset", s)), integer(1))
   unplayed <- dplyr::coalesce(a, 0L) == 0L & dplyr::coalesce(b, 0L) == 0L
   a[unplayed] <- NA_integer_
   b[unplayed] <- NA_integer_
