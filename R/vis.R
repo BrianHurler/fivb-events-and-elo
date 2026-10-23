@@ -46,7 +46,8 @@ vis_post <- function(request_xml, api_url = VIS_API_URL) {
     httr2::req_body_form(Request = request_xml) |>
     httr2::req_headers(
       Accept = "application/xml",
-      `Accept-Encoding` = "gzip, deflate"
+      `Accept-Encoding` = "gzip, deflate",
+      `User-Agent` = "fivb-events-and-elo (USAV Beach performance analysis)"
     ) |>
     httr2::req_retry(max_tries = 5) |>
     httr2::req_timeout(seconds = 120) |>
@@ -204,4 +205,91 @@ vis_get_beach_players <- function(api_url = VIS_API_URL) {
       -full_name
     ) |>
     dplyr::distinct(athlete_id, .keep_all = TRUE)
+}
+
+
+# Live (rally-by-rally) data -------------------------------------------------
+
+# GetBeachLive returns the point sequence recorded by the VIS live scoring
+# application. Options is an OR of export flags; 576 = RallyScore (64) +
+# EventsRallies (512), the minimum that returns one <Rally> per point. Add
+# Events (1) + EventsTimeOffsets (4) + Information (8) + Score (16) = 605 for
+# serving team and timing. The request is public and works for finished matches.
+VIS_BEACH_LIVE_OPTIONS <- 576L
+
+vis_get_beach_live_xml <- function(no_match,
+                                   options = VIS_BEACH_LIVE_OPTIONS,
+                                   api_url = VIS_API_URL) {
+  stopifnot(length(no_match) == 1L, !is.na(no_match))
+
+  request_xml <- paste0(
+    '<Request Type="GetBeachLive" No="', as.integer(no_match),
+    '" Options="', as.integer(options), '"/>'
+  )
+
+  vis_post(request_xml, api_url = api_url)
+}
+
+# Flatten one GetBeachLive response to one row per rally. A response with no
+# live data (<NoData>, <AccessDenied>, or a match element without rallies)
+# returns zero rows with the reason in attr(, "live_status"); only malformed
+# XML or a VIS error element stops. Replayed rallies (score unchanged after a
+# challenge) are kept here and removed in the set-cut stage, so the raw layer
+# stays faithful to the VIS record.
+vis_parse_beach_live_rallies <- function(xml_text, no_match) {
+  doc <- xml2::read_xml(xml_text)
+  root_name <- xml2::xml_name(doc)
+
+  empty <- tibble::tibble(
+    match_no = integer(), set_no = integer(), rally_no = integer(),
+    points_a = integer(), points_b = integer(),
+    no_serving_team = integer(), rally_status = character(),
+    is_canceled = logical()
+  )
+
+  if (root_name %in% c("NoData", "AccessDenied")) {
+    attr(empty, "live_status") <- root_name
+    return(empty)
+  }
+
+  bad_nodes <- xml2::xml_find_all(
+    doc,
+    ".//*[starts-with(local-name(), 'Bad') or local-name()='Error' or local-name()='Unknown']"
+  )
+  if (length(bad_nodes) > 0L) {
+    stop(
+      "VIS returned an error for GetBeachLive ", no_match, ": ",
+      paste(xml2::xml_text(bad_nodes), collapse = " | "),
+      call. = FALSE
+    )
+  }
+
+  rallies <- xml2::xml_find_all(doc, ".//Rally")
+  if (length(rallies) == 0L) {
+    attr(empty, "live_status") <- "no_rallies"
+    return(empty)
+  }
+
+  attr_or_na <- function(nodes, name) {
+    x <- xml2::xml_attr(nodes, name)
+    x[!nzchar(x)] <- NA_character_
+    x
+  }
+
+  set_nodes <- xml2::xml_find_first(rallies, "ancestor::Set")
+
+  out <- tibble::tibble(
+    match_no = as.integer(no_match),
+    set_no = as.integer(attr_or_na(set_nodes, "No")),
+    rally_no = as.integer(attr_or_na(rallies, "No")),
+    points_a = as.integer(attr_or_na(rallies, "PointsTeamA")),
+    points_b = as.integer(attr_or_na(rallies, "PointsTeamB")),
+    no_serving_team = as.integer(attr_or_na(rallies, "NoServingTeam")),
+    rally_status = attr_or_na(rallies, "Status"),
+    is_canceled = tolower(dplyr::coalesce(attr_or_na(rallies, "IsCanceled"), "false")) == "true"
+  ) |>
+    dplyr::arrange(set_no, rally_no)
+
+  attr(out, "live_status") <- "rallies"
+  out
 }

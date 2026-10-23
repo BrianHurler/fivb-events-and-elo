@@ -120,6 +120,19 @@ Reason: downstream studies (BCS KOTB tiebreaks) need scorelines paired with each
 
 Elo calculation is unchanged; the new columns are added after the existing ones.
 
+### 2026-10-23 — Rally-by-rally scores are part of the source layer
+
+`GetBeachLive` (VIS request 6001) returns the recorded point sequence for finished beach matches when called with export options 576 (`RallyScore` + `EventsRallies`). Stage 03c pulls it per match, cached per tournament, and stage 03d derives set-level alternative-format outcomes (set winner, first to 15 with a two-point lead).
+
+Reason: the BCS format study needs to know who would have won a single set to 15, a single set to 21, and the full match on the same historical matches. Reading the real sequence removes the need to reconstruct 15-point outcomes from final set scores. Keeping rallies in this repository follows the raw-first principle and makes them available to every downstream project.
+
+Choices made here:
+
+- Replayed rallies (a challenge that repeats the score) are kept in `beach_rallies.parquet` and removed only in the set-cut stage.
+- QA checks (one point per rally; final rally equals the official set score) are recorded as flags, not enforced, matching how score coverage is handled elsewhere.
+- The pull is excluded from `run-all.R` because it is one request per match. A probe mode (two matches per tournament) establishes coverage before a full pull.
+- The default start date is 2021-01-01 because VIS release notes first mention `GetBeachLive` rally statistics in mid-2021; earlier coverage can be tested by lowering `FIVB_RALLY_START_DATE`.
+
 ## Open decisions before production use
 
 ### Exact production Elo universe

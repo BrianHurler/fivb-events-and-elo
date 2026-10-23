@@ -39,6 +39,9 @@ The raw VIS layer is intentionally broader than any one downstream research proj
 │   ├── 02-classify-tournaments.R
 │   ├── 02b-build-elo-tournament-universe.R
 │   ├── 03-pull-matches.R
+│   ├── 03b-audit-matches.R
+│   ├── 03c-pull-rallies.R
+│   ├── 03d-build-set-cuts.R
 │   ├── 04-build-elo-input.R
 │   ├── 05-calculate-elo.R
 │   ├── 05b-enrich-elo-players.R
@@ -207,7 +210,42 @@ data-processed/pipeline_validation.csv
 data-processed/score_coverage.csv
 ```
 
+Optional rally stages (03c/03d, run explicitly) add:
+
+```text
+data-processed/beach_rallies.parquet
+data-processed/rally_pull_manifest.csv
+data-processed/rally_coverage.csv
+data-processed/beach_set_cuts.parquet
+data-processed/beach_match_set_cuts.parquet
+data-processed/set_cut_qa_failures.csv
+```
+
 Each `athlete_elo_history` row also carries that match's score from the athlete's side: `sets_for`/`sets_against`, `set1_for`–`set3_against`, `points_for`/`points_against`, and `score_complete`, plus `no_in_tournament`, `round_code`, `round_name`, `round_phase`, and `result_type`. Join back to `beach_matches.parquet` on `match_no` = `no` for any other VIS field.
+
+## Rally-by-rally data
+
+The VIS live-scoring application records every rally, and the public `GetBeachLive` request returns that sequence for finished matches as well as live ones. Stage 03c requests it one match at a time:
+
+```text
+<Request Type="GetBeachLive" No="<match number>" Options="576"/>
+```
+
+`Options` is an OR of the export flags documented in the VIS SDK (`Fivb.Vis.Beach.Live.BeachLiveExportOption`): 576 = `RallyScore` (64) + `EventsRallies` (512) is the minimum that returns one `<Rally>` element per point with `PointsTeamA`/`PointsTeamB`. Adding `Events` (1), `EventsTimeOffsets` (4), `Information` (8) and `Score` (16) gives 605 and includes the serving team and rally timing.
+
+Stage 03c is not part of `run-all.R`. It has two modes:
+
+```r
+Sys.setenv(FIVB_RALLY_MODE = "probe")   # first and last match of each tournament
+source("scripts/03c-pull-rallies.R")
+Sys.setenv(FIVB_RALLY_MODE = "full")    # every match in tournaments the probe covered
+source("scripts/03c-pull-rallies.R")
+source("scripts/03d-build-set-cuts.R")
+```
+
+Only normally completed matches (`result_type = 0`) with a real first set in tournaments starting on or after `FIVB_RALLY_START_DATE` (default 2021-01-01) are requested. Per-match results and raw XML are cached under `data-raw/rallies/` so the pull is resumable, and `rally_coverage.csv` reports which tournaments have live data.
+
+Stage 03d derives `beach_set_cuts.parquet` (one row per set: `set_winner`, `first_to_15`, `first_to_15_score`, QA flags) and `beach_match_set_cuts.parquet` (one row per match: `set1_winner`, `set1_first_to_15`, `match_winner`). Replayed rallies after a challenge repeat the previous score and are removed before cutting. Two QA checks are recorded, not enforced: each rally adds exactly one point, and the last rally equals the official VIS set score. Join to `athlete_elo_history.parquet` on `match_no` for pre-match ratings.
 
 ## Recommended next validation
 
