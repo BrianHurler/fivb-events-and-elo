@@ -129,7 +129,7 @@ Reason: the BCS format study needs to know who would have won a single set to 15
 Choices made here:
 
 - Replayed rallies (a challenge that repeats the score) are kept in `beach_rallies.parquet` and removed only in the set-cut stage.
-- QA checks (one point per rally; final rally equals the official set score) are recorded as flags, not enforced, matching how score coverage is handled elsewhere.
+- QA checks (feed starts at the first point; one point per rally; final rally equals the official set score) are recorded as flags, not enforced, matching how score coverage is handled elsewhere.
 - The pull is excluded from `run-all.R` because it is one request per match. A probe mode (two matches per tournament) establishes coverage before a full pull.
 - The default start date is 2021-01-01 because VIS release notes first mention `GetBeachLive` rally statistics in mid-2021; earlier coverage can be tested by lowering `FIVB_RALLY_START_DATE`.
 

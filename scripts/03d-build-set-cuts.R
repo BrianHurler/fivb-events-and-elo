@@ -9,8 +9,10 @@
 # winner) and the full match, all observed on the same matches.
 #
 # Replayed rallies (a challenge that repeats the score) are dropped before
-# cutting. Two QA checks are recorded per set, not enforced: every rally adds
-# exactly one point, and the final rally equals the official VIS set score.
+# cutting. Three QA checks are recorded per set, not enforced: the feed starts
+# at the first point, every rally adds exactly one point, and the final rally
+# equals the official VIS set score. A feed that starts late could hide which
+# team reached 15 first, so it is not trusted.
 # Downstream analysis should filter on qa_pass.
 #
 # Run explicitly after scripts/03c-pull-rallies.R:
@@ -52,6 +54,7 @@ set_cuts <- rallies |>
     final_points_a = dplyr::last(points_a),
     final_points_b = dplyr::last(points_b),
     steps_valid = all(is.na(step) | step == 1L),
+    starts_at_first_point = dplyr::first(total) == 1L,
     cut_i = cut_index(points_a, points_b, golden_set_target),
     cut_points_a = if (is.na(cut_i)) NA_integer_ else points_a[cut_i],
     cut_points_b = if (is.na(cut_i)) NA_integer_ else points_b[cut_i],
@@ -96,7 +99,7 @@ set_cuts <- set_cuts |>
       !is.na(official_points_a) &
       final_points_a == official_points_a &
       final_points_b == official_points_b,
-    qa_pass = steps_valid & matches_official & !is.na(set_winner)
+    qa_pass = steps_valid & starts_at_first_point & matches_official & !is.na(set_winner)
   ) |>
   dplyr::arrange(match_no, set_no)
 
@@ -146,7 +149,8 @@ qa_failures <- set_cuts |>
   dplyr::filter(!qa_pass) |>
   dplyr::select(
     match_no, set_no, n_rallies, final_points_a, final_points_b,
-    official_points_a, official_points_b, steps_valid, matches_official
+    official_points_a, official_points_b, steps_valid, starts_at_first_point,
+    matches_official
   )
 readr::write_csv(qa_failures, "data-processed/set_cut_qa_failures.csv")
 

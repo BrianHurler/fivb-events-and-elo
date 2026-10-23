@@ -245,7 +245,7 @@ source("scripts/03d-build-set-cuts.R")
 
 Only normally completed matches (`result_type = 0`) with a real first set in tournaments starting on or after `FIVB_RALLY_START_DATE` (default 2021-01-01) are requested. Per-match results and raw XML are cached under `data-raw/rallies/` so the pull is resumable, and `rally_coverage.csv` reports which tournaments have live data.
 
-Stage 03d derives `beach_set_cuts.parquet` (one row per set: `set_winner`, `first_to_15`, `first_to_15_score`, QA flags) and `beach_match_set_cuts.parquet` (one row per match: `set1_winner`, `set1_first_to_15`, `match_winner`). Replayed rallies after a challenge repeat the previous score and are removed before cutting. Two QA checks are recorded, not enforced: each rally adds exactly one point, and the last rally equals the official VIS set score. Join to `athlete_elo_history.parquet` on `match_no` for pre-match ratings.
+Stage 03d derives `beach_set_cuts.parquet` (one row per set: `set_winner`, `first_to_15`, `first_to_15_score`, QA flags) and `beach_match_set_cuts.parquet` (one row per match: `set1_winner`, `set1_first_to_15`, `match_winner`). Replayed rallies after a challenge repeat the previous score and are removed before cutting. Three QA checks are recorded, not enforced: the feed starts at the first point, each rally adds exactly one point, and the last rally equals the official VIS set score. In the 2021+ probe, 17 of 1,516 sets failed (feeds stopped early or started late, sides mirrored, or points skipped). Join to `athlete_elo_history.parquet` on `match_no` for pre-match ratings.
 
 ## Recommended next validation
 
